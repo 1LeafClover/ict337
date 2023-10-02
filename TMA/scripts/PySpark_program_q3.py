@@ -97,12 +97,10 @@ def process_missing_data(flights_df, logger):
 
     Parameters
     ----------
-    logger : object
-        Logger object for logging messages.
-    spark : object
-        Spark session.
     flights_df : DataFrame
         DataFrame containing the data.
+    logger : object
+        Logger object for logging messages.
 
     Returns
     -------
@@ -153,6 +151,28 @@ def process_missing_data(flights_df, logger):
 
 
 def count_by(df, grouped_columns, logger):
+    """
+    Count occurrences of rows by grouping columns.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing the data.
+    grouped_columns : list
+        List of columns to group by.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with counts, sorted in descending order.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during counting.
+    """
     try:
         count_by_col = df.groupby(*grouped_columns).count()
         sorted_counts_df = count_by_col.orderBy("count", ascending=False)
@@ -164,6 +184,28 @@ def count_by(df, grouped_columns, logger):
 
 
 def percentage_by(df, grouped_columns, logger):
+    """
+    Calculate the percentage of occurrences by grouping columns.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing the data.
+    grouped_columns : list
+        List of columns to group by.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with counts and percentages, sorted in descending order.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during percentage calculation.
+    """
     try:
         total_flights = df.count()
         total_flights_by = df.groupby(*grouped_columns).count()
@@ -176,12 +218,36 @@ def percentage_by(df, grouped_columns, logger):
         raise e
 
 
-def top_planes_by(df, column, n, logger):
+def top_cat_by(df, column, n, logger):
+    """
+    Find the top n category.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing the data.
+    column : str
+        The column to group by and count.
+    n : int
+        Number of top category to retrieve.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with the top category, sorted by count in descending order.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during counting.
+    """
     try:
-        top_planes = df.groupBy(column).count().orderBy(
+        top_cat = df.groupBy(column).count().orderBy(
             "count", ascending=False).limit(n)
 
-        return top_planes
+        return top_cat
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -231,9 +297,9 @@ def main():
         flights_by_dest = count_by(clean_data_flights_df, ["dest"], logger)
         flights_by_dest.show(5)
 
-        top_planes = top_planes_by(
+        top_cat = top_cat_by(
             clean_data_flights_df, "tailnum", 10, logger)
-        top_planes.show()
+        top_cat.show()
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
