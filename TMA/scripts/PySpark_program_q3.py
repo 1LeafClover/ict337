@@ -79,6 +79,7 @@ def load_data(spark, logger, file_path=DATA_FILE_PATH):
         logger.info("Sample rows in the flights_df DataFrame:")
         flights_df.show(5)
         flight_occurrence = flights_df.count()
+
         logger.info(f"There are {flight_occurrence} number of flights_df.\n")
         logger.info(flights_df.schema)
         return flights_df
@@ -86,11 +87,12 @@ def load_data(spark, logger, file_path=DATA_FILE_PATH):
         if "Path does not exist" in str(e):
             logger.error(FILE_NOT_FOUND_MESSAGE.format(file_path))
             raise FileNotFoundError(f"File not found: {file_path}")
+
         logger.error(LOAD_DATA_ERROR_MESSAGE.format(str(e)))
         raise e
 
 
-def process_missing_data(logger, flights_df):
+def process_missing_data(flights_df, logger):
     """Process and analyze the loaded data.
 
     Parameters
@@ -100,6 +102,11 @@ def process_missing_data(logger, flights_df):
     spark : object
         Spark session.
     flights_df : DataFrame
+        DataFrame containing the data.
+
+    Returns
+    -------
+    DataFrame
         DataFrame containing the data.
 
     Raises
@@ -136,8 +143,45 @@ def process_missing_data(logger, flights_df):
         clean_data_flights_df.show(5)
 
         clean_flight_occurrence = clean_data_flights_df.count()
+
         logger.info(
             f"{clean_flight_occurrence} rows remained after removing the rows with missing values.\n")
+        return clean_data_flights_df
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def count_by(df, grouped_columns, logger):
+    try:
+        count_by_col = df.groupby(*grouped_columns).count()
+        sorted_counts_df = count_by_col.orderBy("count", ascending=False)
+
+        return sorted_counts_df
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def percentage_by(df, grouped_columns, logger):
+    try:
+        total_flights = df.count()
+        total_flights_by = df.groupby(*grouped_columns).count()
+        col_percentage = total_flights_by.withColumn(
+            "percentage", (total_flights_by["count"] / total_flights) * 100).orderBy("percentage", ascending=False)
+
+        return col_percentage
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def top_planes_by(df, column, n, logger):
+    try:
+        top_planes = df.groupBy(column).count().orderBy(
+            "count", ascending=False).limit(n)
+
+        return top_planes
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -167,7 +211,29 @@ def main():
     spark = create_spark_session()
     try:
         flights_data_frame = load_data(spark, logger)
-        process_missing_data(logger, flights_data_frame)
+        clean_data_flights_df = process_missing_data(
+            flights_data_frame, logger)
+
+        flight_by_year_month = count_by(clean_data_flights_df, [
+            "year", "month"], logger)
+        flight_by_year_month.show(5)
+
+        flight_by_day = count_by(clean_data_flights_df, ["day"], logger)
+        flight_by_day.show(5)
+
+        percentage_flight_by_carrier = percentage_by(
+            clean_data_flights_df, ["carrier"], logger)
+        percentage_flight_by_carrier.show(5)
+
+        flights_by_origin = count_by(clean_data_flights_df, ["origin"], logger)
+        flights_by_origin.show(5)
+
+        flights_by_dest = count_by(clean_data_flights_df, ["dest"], logger)
+        flights_by_dest.show(5)
+
+        top_planes = top_planes_by(
+            clean_data_flights_df, "tailnum", 10, logger)
+        top_planes.show()
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
