@@ -1,9 +1,12 @@
 import logging
+import os
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, sum, avg, min, max, when
 
 # Constants
-DATA_FILE_PATH = r"C:\Everything\SUSS\DE\ICT337\TMA\data\flights_data_v2.csv"
+SCRIPTS_DIR = os.path.abspath(os.path.dirname(__file__))
+DATA_DIR = os.path.join(SCRIPTS_DIR, "..", "data")
+FLIGHTS_DATA_FILE_PATH = os.path.join(DATA_DIR, "flights_data_v2.csv")
 LOGGING_LEVEL = logging.INFO
 LOAD_DATA_ERROR_MESSAGE = "An error occurred while loading data: {}"
 FILE_NOT_FOUND_MESSAGE = "The specified file does not exist: {}"
@@ -51,7 +54,7 @@ def create_spark_session(app_name="TMA_Data_Analysis"):
         .getOrCreate()
 
 
-def load_data(spark, logger, file_path=DATA_FILE_PATH):
+def load_data(spark, logger, file_path):
     """
     Load data from CSV file into a Spark DataFrame.
 
@@ -62,7 +65,7 @@ def load_data(spark, logger, file_path=DATA_FILE_PATH):
     logger : Logger
         Logger object for logging messages.
     file_path : str, optional
-        The path to the CSV file to load, by default DATA_FILE_PATH.
+        The path to the CSV file to load.
 
     Returns
     -------
@@ -83,7 +86,7 @@ def load_data(spark, logger, file_path=DATA_FILE_PATH):
     try:
         # Load data from csv
         df = spark.read.option("inferSchema", "true").option(
-            "header", "true").csv(DATA_FILE_PATH)
+            "header", "true").csv(file_path)
 
         # Display sample data, number of occurrences, and schema
         logger.info("Sample rows in the df DataFrame:")
@@ -722,7 +725,7 @@ def main():
     logger = configure_logging()
     spark = create_spark_session()
     try:
-        flights_data_frame = load_data(spark, logger)
+        flights_data_frame = load_data(spark, logger, FLIGHTS_DATA_FILE_PATH)
         clean_flights_data_df = process_missing_data(
             flights_data_frame, logger)
 
