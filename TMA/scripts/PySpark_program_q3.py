@@ -82,17 +82,17 @@ def load_data(spark, logger, file_path=DATA_FILE_PATH):
     """
     try:
         # Load data from csv
-        flights_df = spark.read.option("inferSchema", "true").option(
+        df = spark.read.option("inferSchema", "true").option(
             "header", "true").csv(DATA_FILE_PATH)
 
         # Display sample data, number of occurrences, and schema
-        logger.info("Sample rows in the flights_df DataFrame:")
-        flights_df.show(5)
-        flight_occurrence = flights_df.count()
+        logger.info("Sample rows in the df DataFrame:")
+        df.show(5)
+        occurrence = df.count()
 
-        logger.info(f"There are {flight_occurrence} number of flights_df.\n")
-        logger.info(flights_df.schema)
-        return flights_df
+        logger.info(f"There are {occurrence} number of df.\n")
+        logger.info(df.schema)
+        return df
     except Exception as e:
         if "Path does not exist" in str(e):
             logger.error(FILE_NOT_FOUND_MESSAGE.format(file_path))
@@ -102,12 +102,12 @@ def load_data(spark, logger, file_path=DATA_FILE_PATH):
         raise e
 
 
-def process_missing_data(flights_df, logger):
+def process_missing_data(df, logger):
     """Process and analyze the loaded data.
 
     Parameters
     ----------
-    flights_df : DataFrame
+    df : DataFrame
         DataFrame containing the data.
     logger : object
         Logger object for logging messages.
@@ -131,7 +131,7 @@ def process_missing_data(flights_df, logger):
     """
     try:
         # Check for missing values in columns
-        columns_to_check = flights_df.columns
+        columns_to_check = df.columns
         filter_condition = None
 
         for column_name in columns_to_check:
@@ -141,27 +141,27 @@ def process_missing_data(flights_df, logger):
                 filter_condition = filter_condition | col(column_name).isNull()
 
         # Find and display rows with missing values
-        missing_data_flights_df = flights_df.filter(filter_condition)
+        missing_data_df = df.filter(filter_condition)
 
         logger.info(
-            "Sample rows in the flights_df DataFrame with Missing Value:")
-        missing_data_flights_df.show(5)
+            "Sample rows in the df DataFrame with Missing Value:")
+        missing_data_df.show(5)
 
-        missing_occurrence = missing_data_flights_df.count()
+        missing_occurrence = missing_data_df.count()
         logger.info(
-            f"There are {missing_occurrence} rows with missing values in flights_df.\n")
+            f"There are {missing_occurrence} rows with missing values in df.\n")
 
         # Remove rows with missing values
-        clean_data_flights_df = flights_df.filter(~filter_condition)
+        clean_data_df = df.filter(~filter_condition)
 
-        logger.info("Sample rows in the cleaned flights_df DataFrame:")
-        clean_data_flights_df.show(5)
+        logger.info("Sample rows in the cleaned df DataFrame:")
+        clean_data_df.show(5)
 
-        clean_flight_occurrence = clean_data_flights_df.count()
+        clean_occurrence = clean_data_df.count()
 
         logger.info(
-            f"{clean_flight_occurrence} rows remained after removing the rows with missing values.\n")
-        return clean_data_flights_df
+            f"{clean_occurrence} rows remained after removing the rows with missing values.\n")
+        return clean_data_df
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -723,86 +723,86 @@ def main():
     spark = create_spark_session()
     try:
         flights_data_frame = load_data(spark, logger)
-        clean_data_flights_df = process_missing_data(
+        clean_data_df = process_missing_data(
             flights_data_frame, logger)
 
-        flight_by_year_month = count_by(clean_data_flights_df, [
+        flight_by_year_month = count_by(clean_data_df, [
             "year", "month"], logger)
         flight_by_year_month.show(5)
 
-        flight_by_day = count_by(clean_data_flights_df, ["day"], logger)
+        flight_by_day = count_by(clean_data_df, ["day"], logger)
         flight_by_day.show(5)
 
         percentage_flight_by_carrier = percentage_by(
-            clean_data_flights_df, ["carrier"], logger)
+            clean_data_df, ["carrier"], logger)
         percentage_flight_by_carrier.show(5)
 
-        flights_by_origin = count_by(clean_data_flights_df, ["origin"], logger)
+        flights_by_origin = count_by(clean_data_df, ["origin"], logger)
         flights_by_origin.show(5)
 
-        flights_by_dest = count_by(clean_data_flights_df, ["dest"], logger)
+        flights_by_dest = count_by(clean_data_df, ["dest"], logger)
         flights_by_dest.show(5)
 
         top_cat = top_cat_by(
-            clean_data_flights_df, "tailnum", 10, logger)
+            clean_data_df, "tailnum", 10, logger)
         top_cat.show()
 
-        flights_by_hour = count_by(clean_data_flights_df, ["hour"], logger)
+        flights_by_hour = count_by(clean_data_df, ["hour"], logger)
         flights_by_hour.show(5)
 
         avg_pos_dep_delay_by_carrier = analyze_positive_delay(
-            clean_data_flights_df, "carrier", "dep_delay", logger)
+            clean_data_df, "carrier", "dep_delay", logger)
         avg_pos_dep_delay_by_carrier.show(5)
 
         avg_dep_delay_by_carrier = analyze_average_delay(
-            clean_data_flights_df, "carrier", "dep_delay", logger)
+            clean_data_df, "carrier", "dep_delay", logger)
         avg_dep_delay_by_carrier.show(5)
 
         avg_dep_delay_by_month = analyze_average_delay(
-            clean_data_flights_df, "month", "dep_delay", logger)
+            clean_data_df, "month", "dep_delay", logger)
         avg_dep_delay_by_month.show(5)
 
         avg_dep_delay_by_hour = analyze_average_delay(
-            clean_data_flights_df, "hour", "dep_delay", logger)
+            clean_data_df, "hour", "dep_delay", logger)
         avg_dep_delay_by_hour.show(5)
 
         avg_neg_dep_delay_by_carrier = analyze_negative_delay(
-            clean_data_flights_df, "carrier", "dep_delay", logger)
+            clean_data_df, "carrier", "dep_delay", logger)
         avg_neg_dep_delay_by_carrier.show(5)
 
         avg_neg_dep_delay_by_month = analyze_negative_delay(
-            clean_data_flights_df, "month", "dep_delay", logger)
+            clean_data_df, "month", "dep_delay", logger)
         avg_neg_dep_delay_by_month.show(5)
 
         avg_neg_dep_delay_by_hour = analyze_negative_delay(
-            clean_data_flights_df, "hour", "dep_delay", logger)
+            clean_data_df, "hour", "dep_delay", logger)
         avg_neg_dep_delay_by_hour.show(5)
 
         distance_stats = numeric_stats(
-            clean_data_flights_df, "carrier", "distance", logger)
+            clean_data_df, "carrier", "distance", logger)
         distance_stats.show(5)
 
-        transformed_01_flights_df = compute_flight_speed(
-            clean_data_flights_df, "distance", "air_time", logger)
+        transformed_01_df = compute_flight_speed(
+            clean_data_df, "distance", "air_time", logger)
 
         speed_stats = numeric_stats(
-            transformed_01_flights_df, "carrier", "flight_speed (miles per hour)", logger)
+            transformed_01_df, "carrier", "flight_speed (miles per hour)", logger)
         speed_stats.show(5)
 
         shortest_flight_distance_PDX = shortest_n_flight_from_origin(
-            transformed_01_flights_df, "origin", "PDX", "distance", 1, logger)
+            transformed_01_df, "origin", "PDX", "distance", 1, logger)
         shortest_flight_distance_PDX.show()
 
         longest_flight_distance_SEA = longest_n_flight_from_origin(
-            transformed_01_flights_df, "origin", "SEA", "distance", 1, logger)
+            transformed_01_df, "origin", "SEA", "distance", 1, logger)
         longest_flight_distance_SEA.show()
 
         average_duration_UA_SEA = average_duration(
-            transformed_01_flights_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
+            transformed_01_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
         average_duration_UA_SEA.show()
 
         total_duration_UA_SEA = total_duration(
-            transformed_01_flights_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
+            transformed_01_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
         total_duration_UA_SEA.show()
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
