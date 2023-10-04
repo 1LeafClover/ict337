@@ -723,67 +723,67 @@ def main():
     spark = create_spark_session()
     try:
         flights_data_frame = load_data(spark, logger)
-        clean_data_df = process_missing_data(
+        clean_flights_data_df = process_missing_data(
             flights_data_frame, logger)
 
-        flight_by_year_month = count_by(clean_data_df, [
+        flight_by_year_month = count_by(clean_flights_data_df, [
             "year", "month"], logger)
         flight_by_year_month.show(5)
 
-        flight_by_day = count_by(clean_data_df, ["day"], logger)
+        flight_by_day = count_by(clean_flights_data_df, ["day"], logger)
         flight_by_day.show(5)
 
         percentage_flight_by_carrier = percentage_by(
-            clean_data_df, ["carrier"], logger)
+            clean_flights_data_df, ["carrier"], logger)
         percentage_flight_by_carrier.show(5)
 
-        flights_by_origin = count_by(clean_data_df, ["origin"], logger)
+        flights_by_origin = count_by(clean_flights_data_df, ["origin"], logger)
         flights_by_origin.show(5)
 
-        flights_by_dest = count_by(clean_data_df, ["dest"], logger)
+        flights_by_dest = count_by(clean_flights_data_df, ["dest"], logger)
         flights_by_dest.show(5)
 
         top_cat = top_cat_by(
-            clean_data_df, "tailnum", 10, logger)
+            clean_flights_data_df, "tailnum", 10, logger)
         top_cat.show()
 
-        flights_by_hour = count_by(clean_data_df, ["hour"], logger)
+        flights_by_hour = count_by(clean_flights_data_df, ["hour"], logger)
         flights_by_hour.show(5)
 
         avg_pos_dep_delay_by_carrier = analyze_positive_delay(
-            clean_data_df, "carrier", "dep_delay", logger)
+            clean_flights_data_df, "carrier", "dep_delay", logger)
         avg_pos_dep_delay_by_carrier.show(5)
 
         avg_dep_delay_by_carrier = analyze_average_delay(
-            clean_data_df, "carrier", "dep_delay", logger)
+            clean_flights_data_df, "carrier", "dep_delay", logger)
         avg_dep_delay_by_carrier.show(5)
 
         avg_dep_delay_by_month = analyze_average_delay(
-            clean_data_df, "month", "dep_delay", logger)
+            clean_flights_data_df, "month", "dep_delay", logger)
         avg_dep_delay_by_month.show(5)
 
         avg_dep_delay_by_hour = analyze_average_delay(
-            clean_data_df, "hour", "dep_delay", logger)
+            clean_flights_data_df, "hour", "dep_delay", logger)
         avg_dep_delay_by_hour.show(5)
 
         avg_neg_dep_delay_by_carrier = analyze_negative_delay(
-            clean_data_df, "carrier", "dep_delay", logger)
+            clean_flights_data_df, "carrier", "dep_delay", logger)
         avg_neg_dep_delay_by_carrier.show(5)
 
         avg_neg_dep_delay_by_month = analyze_negative_delay(
-            clean_data_df, "month", "dep_delay", logger)
+            clean_flights_data_df, "month", "dep_delay", logger)
         avg_neg_dep_delay_by_month.show(5)
 
         avg_neg_dep_delay_by_hour = analyze_negative_delay(
-            clean_data_df, "hour", "dep_delay", logger)
+            clean_flights_data_df, "hour", "dep_delay", logger)
         avg_neg_dep_delay_by_hour.show(5)
 
         distance_stats = numeric_stats(
-            clean_data_df, "carrier", "distance", logger)
+            clean_flights_data_df, "carrier", "distance", logger)
         distance_stats.show(5)
 
         transformed_01_df = compute_flight_speed(
-            clean_data_df, "distance", "air_time", logger)
+            clean_flights_data_df, "distance", "air_time", logger)
 
         speed_stats = numeric_stats(
             transformed_01_df, "carrier", "flight_speed (miles per hour)", logger)
