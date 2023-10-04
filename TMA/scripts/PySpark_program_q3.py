@@ -7,6 +7,7 @@ from pyspark.sql.functions import col, sum, avg, min, max, when
 SCRIPTS_DIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(SCRIPTS_DIR, "..", "data")
 FLIGHTS_DATA_FILE_PATH = os.path.join(DATA_DIR, "flights_data_v2.csv")
+PLANES_DATA_FILE_PATH = os.path.join(DATA_DIR, "planes_data_v2.csv")
 LOGGING_LEVEL = logging.INFO
 LOAD_DATA_ERROR_MESSAGE = "An error occurred while loading data: {}"
 FILE_NOT_FOUND_MESSAGE = "The specified file does not exist: {}"
@@ -251,7 +252,7 @@ def percentage_by(df, grouped_columns, logger):
         raise e
 
 
-def top_cat_by(df, column, n, logger):
+def top_n_cat_by(df, grouped_columns, n, logger):
     """
     Find the top n category.
 
@@ -259,8 +260,8 @@ def top_cat_by(df, column, n, logger):
     ----------
     df : DataFrame
         DataFrame containing the data.
-    column : str
-        The column to group by and count.
+    grouped_columns : list
+        List of columns to group by.
     n : int
         Number of top category to retrieve.
     logger : object
@@ -278,15 +279,162 @@ def top_cat_by(df, column, n, logger):
 
     Notes
     -----
-    This function groups the data in the specified DataFrame by the given column and counts
+    This function groups the data in the specified DataFrame by the specified columns and counts
     the occurrences of each category. It returns a DataFrame containing the top n categories
     with the highest counts, sorted in descending order based on the count values.
     """
     try:
-        top_cat = df.groupBy(column).count().orderBy(
+        top_cat = df.groupBy(*grouped_columns).count().orderBy(
             "count", ascending=False).limit(n)
 
         return top_cat
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def bottom_n_cat_by(df, grouped_columns, n, logger):
+    """
+    Find the bottom n category.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing the data.
+    grouped_columns : list
+        List of columns to group by.
+    n : int
+        Number of bottom category to retrieve.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with the bottom category, sorted by count in ascending order.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during counting.
+
+    Notes
+    -----
+    This function groups the data in the specified DataFrame by the specified columns and counts
+    the occurrences of each category. It returns a DataFrame containing the bottom n categories
+    with the highest counts, sorted in ascending order based on the count values.
+    """
+    try:
+        top_cat = df.groupBy(*grouped_columns).count().orderBy(
+            "count", ascending=True).limit(n)
+
+        return top_cat
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def sql_top_n_cat_by(df, grouped_columns, n, spark, logger):
+    """
+    Find the top n category.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing the data.
+    grouped_columns : list
+        List of columns to group by.
+    n : int
+        Number of top category to retrieve.
+    spark : SparkSession
+        The Spark session.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with the top category, sorted by count in descending order.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during counting.
+
+    Notes
+    -----
+    This function groups the data in the specified DataFrame by the specified columns and counts
+    the occurrences of each category. It returns a DataFrame containing the top n categories
+    with the highest counts, sorted in descending order based on the count values.
+    """
+    try:
+        df.createOrReplaceTempView("top_flights_planes")
+        columns_str = ", ".join(grouped_columns)
+
+        query = f"""
+        SELECT {columns_str}, COUNT(*) AS count
+        FROM top_flights_planes
+        GROUP BY {columns_str}
+        ORDER BY count DESC
+        LIMIT {n}
+        """
+
+        sql_top_n_cat = spark.sql(query)
+
+        return sql_top_n_cat
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def sql_bottom_n_cat_by(df, grouped_columns, n, spark, logger):
+    """
+    Find the bottom n category.
+
+    Parameters
+    ----------
+    df : DataFrame
+        DataFrame containing the data.
+    grouped_columns : list
+        List of columns to group by.
+    n : int
+        Number of bottom category to retrieve.
+    spark : SparkSession
+        The Spark session.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame with the bottom category, sorted by count in ascending order.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during counting.
+
+    Notes
+    -----
+    This function groups the data in the specified DataFrame by the specified columns and counts
+    the occurrences of each category. It returns a DataFrame containing the bottom n categories
+    with the highest counts, sorted in ascending order based on the count values.
+    """
+    try:
+        df.createOrReplaceTempView("bottom_flights_planes")
+        columns_str = ", ".join(grouped_columns)
+
+        query = f"""
+        SELECT {columns_str}, COUNT(*) AS count
+        FROM bottom_flights_planes
+        GROUP BY {columns_str}
+        ORDER BY count ASC
+        LIMIT {n}
+        """
+
+        sql_bottom_n_cat = spark.sql(query)
+
+        return sql_bottom_n_cat
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -746,9 +894,9 @@ def main():
         flights_by_dest = count_by(clean_flights_data_df, ["dest"], logger)
         flights_by_dest.show(5)
 
-        top_cat = top_cat_by(
-            clean_flights_data_df, "tailnum", 10, logger)
-        top_cat.show()
+        top_10_planes = top_n_cat_by(
+            clean_flights_data_df, ["tailnum"], 10, logger)
+        top_10_planes.show()
 
         flights_by_hour = count_by(clean_flights_data_df, ["hour"], logger)
         flights_by_hour.show(5)
@@ -787,6 +935,7 @@ def main():
 
         transformed_01_df = compute_flight_speed(
             clean_flights_data_df, "distance", "air_time", logger)
+        transformed_01_df.show(5)
 
         speed_stats = numeric_stats(
             transformed_01_df, "carrier", "flight_speed (miles per hour)", logger)
@@ -807,6 +956,37 @@ def main():
         total_duration_UA_SEA = total_duration(
             transformed_01_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
         total_duration_UA_SEA.show()
+
+        planes_data_frame = load_data(spark, logger, PLANES_DATA_FILE_PATH)
+
+        clean_planes_data_df = planes_data_frame.drop("speed")
+        clean_planes_data_df = clean_planes_data_df.withColumnRenamed(
+            "year", "plane_year")
+        clean_planes_data_df.show(5)
+
+        flights_planes_df = transformed_01_df.join(
+            clean_planes_data_df, on=["tailnum"], how="inner")
+        flights_planes_df.show(5)
+        logger.info(flights_planes_df.count())
+
+        clean_flights_planes_data_df = process_missing_data(
+            flights_planes_df, logger)
+
+        top_20_flights_planes = top_n_cat_by(clean_flights_planes_data_df, [
+            "carrier", "model", "plane_year"], 20, logger)
+        top_20_flights_planes.show()
+
+        bottom_20_flights_planes = bottom_n_cat_by(clean_flights_planes_data_df, [
+            "carrier", "model", "plane_year"], 20, logger)
+        bottom_20_flights_planes.show()
+
+        sql_top_20_flights_planes = sql_top_n_cat_by(clean_flights_planes_data_df, [
+            "carrier", "model", "plane_year"], 20, spark, logger)
+        sql_top_20_flights_planes.show()
+
+        sql_bottom_20_flights_planes = sql_bottom_n_cat_by(clean_flights_planes_data_df, [
+            "carrier", "model", "plane_year"], 20, spark, logger)
+        sql_bottom_20_flights_planes.show()
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
