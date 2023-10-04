@@ -78,7 +78,7 @@ def load_data(spark, logger, file_path=DATA_FILE_PATH):
     -----
     This function reads data from a CSV file and loads it into a Spark DataFrame.
 
-    The default logging level is set to the value of the constant LOGGING_LEVEL.
+    Note: The default logging level is set to the value of the constant LOGGING_LEVEL.
     """
     try:
         # Load data from csv
@@ -309,6 +309,11 @@ def analyze_average_delay(df, column, delay_column, logger):
     DataFrame
         DataFrame containing the average departure/arrival delay.
 
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
     Notes
     -----
     This function calculates the average departure/arrival delay for a specified column,
@@ -346,6 +351,11 @@ def analyze_positive_delay(df, column, delay_column, logger):
     -------
     DataFrame
         DataFrame containing the analysis of positive departure/arrival delay.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
 
     Notes
     -----
@@ -385,6 +395,11 @@ def analyze_negative_delay(df, column, delay_column, logger):
     DataFrame
         DataFrame containing the analysis of negative departure/arrival delay.
 
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
     Notes
     -----
     This function calculates the average negative departure/arrival delay for a specified column,
@@ -404,6 +419,37 @@ def analyze_negative_delay(df, column, delay_column, logger):
 
 
 def numeric_stats(df, group_by_column, numeric_column, logger):
+    """
+    Compute statistics for a numeric column grouped by another column.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The input DataFrame containing the data.
+    group_by_column : str
+        The name of the column to group by.
+    numeric_column : str
+        The name of the numeric column to compute statistics for.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        A DataFrame containing statistics (average, minimum, and maximum) for the numeric column
+        grouped by the specified column.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
+    Notes
+    -----
+    1. This function calculates statistics (average, minimum, maximum) for a specified numeric column in the DataFrame.
+    2. The statistics are computed based on groups formed by the values in the specified 'group_by_column.'
+    3. The resulting DataFrame is ordered in descending order of the average of the numeric column.
+    """
     try:
         col_stats = df.groupBy(group_by_column).agg(
             avg(numeric_column).alias(f"average_{numeric_column}"),
@@ -418,6 +464,38 @@ def numeric_stats(df, group_by_column, numeric_column, logger):
 
 
 def compute_flight_speed(df, distance, air_time, logger):
+    """
+    Calculate flight speed in miles per hour and add it as a new column.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The input DataFrame containing flight data.
+    distance : str
+        The name of the column representing flight distance in miles.
+    air_time : str
+        The name of the column representing flight air time in minutes.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        A DataFrame with an additional column, "flight_speed (miles per hour)," representing the calculated
+        flight speed for each record.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
+    Notes
+    -----
+    This function calculates the flight speed (in miles per hour) by dividing the flight distance (in miles)
+    by the flight air time (in minutes) and adds it as a new column to the input DataFrame.
+
+    Note: Flight air time is converted to hours by dividing by 60 to obtain the speed in miles per hour.
+    """
     try:
         df_add_speed = df.withColumn(
             "flight_speed (miles per hour)", (col(distance) / (col(air_time) / 60)))
@@ -429,6 +507,39 @@ def compute_flight_speed(df, distance, air_time, logger):
 
 
 def shortest_n_flight_from_origin(df, origin_column, origin_name, measurement, n, logger):
+    """
+    Find the shortest 'n' flights from a specific origin based on a measurement.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The DataFrame containing the flight data.
+    origin_column : str
+        The name of the column representing the flight origin.
+    origin_name : str
+        The name of the origin for which to find the shortest flights.
+    measurement : str
+        The column name representing the measurement by which to find the shortest flights.
+    n : int
+        The number of shortest flights to retrieve.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame containing the 'n' shortest flights from the specified origin based on the given measurement.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
+    Notes
+    -----
+    This function filters the DataFrame to select flights originating from a specific location (origin_name).
+    It then sorts these flights by the provided measurement column in ascending order and retrieves the top 'n' shortest flights.
+    """
     try:
         origin = df.filter(df[origin_column] == origin_name)
 
@@ -442,6 +553,39 @@ def shortest_n_flight_from_origin(df, origin_column, origin_name, measurement, n
 
 
 def longest_n_flight_from_origin(df, origin_column, origin_name, measurement, n, logger):
+    """
+    Find the longest 'n' flights from a specific origin based on a measurement.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The DataFrame containing the flight data.
+    origin_column : str
+        The name of the column representing the flight origin.
+    origin_name : str
+        The name of the origin for which to find the longest flights.
+    measurement : str
+        The column name representing the measurement by which to find the longest flights.
+    n : int
+        The number of longest flights to retrieve.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame containing the 'n' longest flights from the specified origin based on the given measurement.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
+    Notes
+    -----
+    This function filters the DataFrame to select flights originating from a specific location (origin_name).
+    It then sorts these flights by the provided measurement column in ascending order and retrieves the top 'n' longest flights.
+    """
     try:
         origin = df.filter(df[origin_column] == origin_name)
 
@@ -455,6 +599,41 @@ def longest_n_flight_from_origin(df, origin_column, origin_name, measurement, n,
 
 
 def average_duration(df, carrier_column, carrier_name, origin_column, origin_name, measurement, logger):
+    """
+    Calculate the average flight duration for a specific carrier and origin.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The input DataFrame containing flight data.
+    carrier_column : str
+        The name of the column representing the carrier.
+    carrier_name : str
+        The name of the carrier for which to calculate the average duration.
+    origin_column : str
+        The name of the column representing the origin airport.
+    origin_name : str
+        The name of the origin airport for which to calculate the average duration.
+    measurement : str
+        The name of the column representing the flight duration measurement in minutes.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        A DataFrame with the average flight duration for the specified carrier and origin.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
+    Notes
+    -----
+    This function filters the input DataFrame to select flights operated by a specific carrier and originating from a
+    specific airport. It then calculates the average flight duration (in minutes) for these flights.
+    """
     try:
         carrier = df.filter(df[carrier_column] == carrier_name)
         origin = carrier.filter(df[origin_column] == origin_name)
@@ -469,6 +648,43 @@ def average_duration(df, carrier_column, carrier_name, origin_column, origin_nam
 
 
 def total_duration(df, carrier_column, carrier_name, origin_column, origin_name, measurement, logger):
+    """
+    Calculate the total flight duration for a specific carrier and origin.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The input DataFrame containing flight data.
+    carrier_column : str
+        The name of the column representing the carrier.
+    carrier_name : str
+        The name of the carrier for which to calculate the total duration.
+    origin_column : str
+        The name of the column representing the origin airport.
+    origin_name : str
+        The name of the origin airport for which to calculate the total duration.
+    measurement : str
+        The name of the column representing the flight duration measurement in minutes.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        A DataFrame with the total flight duration for the specified carrier and origin.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
+    Notes
+    -----
+    This function filters the input DataFrame to select flights operated by a specific carrier and originating from a
+    specific airport. It then calculates the total flight duration (in hours) for these flights.
+
+    Note: Flight air time is converted to hours by dividing by 60 to obtain the total flight duration in hours.
+    """
     try:
         carrier = df.filter(df[carrier_column] == carrier_name)
         origin = carrier.filter(df[origin_column] == origin_name)
