@@ -1,6 +1,6 @@
 import logging
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, avg, when
+from pyspark.sql.functions import col, sum, avg, min, max, when
 
 # Constants
 DATA_FILE_PATH = r"C:\Everything\SUSS\DE\ICT337\TMA\data\flights_data_v2.csv"
@@ -403,6 +403,85 @@ def analyze_negative_delay(df, column, delay_column, logger):
         raise e
 
 
+def numeric_stats(df, group_by_column, numeric_column, logger):
+    try:
+        col_stats = df.groupBy(group_by_column).agg(
+            avg(numeric_column).alias(f"average_{numeric_column}"),
+            min(numeric_column).alias(f"min_{numeric_column}"),
+            max(numeric_column).alias(f"max_{numeric_column}")
+        ).orderBy(f"average_{numeric_column}", ascending=False)
+
+        return col_stats
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def compute_flight_speed(df, distance, air_time, logger):
+    try:
+        df_add_speed = df.withColumn(
+            "flight_speed (miles per hour)", (col(distance) / (col(air_time) / 60)))
+
+        return df_add_speed
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def shortest_n_flight_from_origin(df, origin_column, origin_name, measurement, n, logger):
+    try:
+        origin = df.filter(df[origin_column] == origin_name)
+
+        shortest_flight = origin.select(
+            origin_column, measurement).orderBy(measurement, ascending=True).limit(n)
+
+        return shortest_flight
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def longest_n_flight_from_origin(df, origin_column, origin_name, measurement, n, logger):
+    try:
+        origin = df.filter(df[origin_column] == origin_name)
+
+        longest_flight = origin.select(
+            origin_column, measurement).orderBy(measurement, ascending=False).limit(n)
+
+        return longest_flight
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def average_duration(df, carrier_column, carrier_name, origin_column, origin_name, measurement, logger):
+    try:
+        carrier = df.filter(df[carrier_column] == carrier_name)
+        origin = carrier.filter(df[origin_column] == origin_name)
+
+        average_duration = origin.agg(
+            avg(measurement).alias(f"average_{measurement} (mins)"))
+
+        return average_duration
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def total_duration(df, carrier_column, carrier_name, origin_column, origin_name, measurement, logger):
+    try:
+        carrier = df.filter(df[carrier_column] == carrier_name)
+        origin = carrier.filter(df[origin_column] == origin_name)
+
+        total_duration_hours = origin.agg(
+            (sum(measurement) / 60).alias(f"total_{measurement} (hours)"))
+
+        return total_duration_hours
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
 def main():
     """Entry point of the script.
 
@@ -482,6 +561,33 @@ def main():
         avg_neg_dep_delay_by_hour = analyze_negative_delay(
             clean_data_flights_df, "hour", "dep_delay", logger)
         avg_neg_dep_delay_by_hour.show(5)
+
+        distance_stats = numeric_stats(
+            clean_data_flights_df, "carrier", "distance", logger)
+        distance_stats.show(5)
+
+        transformed_01_flights_df = compute_flight_speed(
+            clean_data_flights_df, "distance", "air_time", logger)
+
+        speed_stats = numeric_stats(
+            transformed_01_flights_df, "carrier", "flight_speed (miles per hour)", logger)
+        speed_stats.show(5)
+
+        shortest_flight_distance_PDX = shortest_n_flight_from_origin(
+            transformed_01_flights_df, "origin", "PDX", "distance", 1, logger)
+        shortest_flight_distance_PDX.show()
+
+        longest_flight_distance_SEA = longest_n_flight_from_origin(
+            transformed_01_flights_df, "origin", "SEA", "distance", 1, logger)
+        longest_flight_distance_SEA.show()
+
+        average_duration_UA_SEA = average_duration(
+            transformed_01_flights_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
+        average_duration_UA_SEA.show()
+
+        total_duration_UA_SEA = total_duration(
+            transformed_01_flights_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
+        total_duration_UA_SEA.show()
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
