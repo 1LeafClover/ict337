@@ -55,6 +55,35 @@ def create_spark_session(app_name="TMA_Data_Analysis"):
         .getOrCreate()
 
 
+def show_dataframe(df, max_rows=100, show_rows=20):
+    """
+    Show rows of a DataFrame with the option to limit the number of rows displayed.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The DataFrame to be displayed.
+
+    max_rows : int, optional
+        The maximum number of rows to display. Default is 20.
+
+    Returns
+    -------
+    None
+
+    Notes
+    -----
+    This function displays rows of the input DataFrame. If the DataFrame contains more
+    rows than the specified `max_rows`, it will limit the display to the first `max_rows`
+    rows. If the DataFrame has fewer rows than `max_rows`, it will display all available
+    rows without truncation.
+    """
+    if df.count() > max_rows:
+        df.show(show_rows)
+    else:
+        df.show(df.count(), truncate=False)
+
+
 def load_data(spark, logger, file_path):
     """
     Load data from CSV file into a Spark DataFrame.
@@ -88,14 +117,6 @@ def load_data(spark, logger, file_path):
         # Load data from csv
         df = spark.read.option("inferSchema", "true").option(
             "header", "true").csv(file_path)
-
-        # Display sample data, number of occurrences, and schema
-        logger.info("Sample rows in the df DataFrame:")
-        df.show(5)
-        occurrence = df.count()
-
-        logger.info(f"There are {occurrence} number of df.\n")
-        logger.info(df.schema)
         return df
     except Exception as e:
         if "Path does not exist" in str(e):
@@ -147,24 +168,14 @@ def process_missing_data(df, logger):
         # Find and display rows with missing values
         missing_data_df = df.filter(filter_condition)
 
-        logger.info(
-            "Sample rows in the df DataFrame with Missing Value:")
-        missing_data_df.show(5)
-
+        logger.info("Sample rows in the df DataFrame with Missing Value:")
+        show_dataframe(missing_data_df)
         missing_occurrence = missing_data_df.count()
         logger.info(
             f"There are {missing_occurrence} rows with missing values in df.\n")
 
         # Remove rows with missing values
         clean_data_df = df.filter(~filter_condition)
-
-        logger.info("Sample rows in the cleaned df DataFrame:")
-        clean_data_df.show(5)
-
-        clean_occurrence = clean_data_df.count()
-
-        logger.info(
-            f"{clean_occurrence} rows remained after removing the rows with missing values.\n")
         return clean_data_df
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -203,7 +214,6 @@ def count_by(df, grouped_columns, logger):
     try:
         count_by_col = df.groupby(*grouped_columns).count()
         sorted_counts_df = count_by_col.orderBy("count", ascending=False)
-
         return sorted_counts_df
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -242,10 +252,10 @@ def percentage_by(df, grouped_columns, logger):
     """
     try:
         total_flights = df.count()
+
         total_flights_by = df.groupby(*grouped_columns).count()
         col_percentage = total_flights_by.withColumn(
             "percentage", (total_flights_by["count"] / total_flights) * 100).orderBy("percentage", ascending=False)
-
         return col_percentage
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -286,7 +296,6 @@ def top_n_cat_by(df, grouped_columns, n, logger):
     try:
         top_cat = df.groupBy(*grouped_columns).count().orderBy(
             "count", ascending=False).limit(n)
-
         return top_cat
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -325,10 +334,9 @@ def bottom_n_cat_by(df, grouped_columns, n, logger):
     with the highest counts, sorted in ascending order based on the count values.
     """
     try:
-        top_cat = df.groupBy(*grouped_columns).count().orderBy(
+        bottom_cat = df.groupBy(*grouped_columns).count().orderBy(
             "count", ascending=True).limit(n)
-
-        return top_cat
+        return bottom_cat
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -380,7 +388,6 @@ def sql_top_n_cat_by(df, grouped_columns, n, spark, logger):
         """
 
         sql_top_n_cat = spark.sql(query)
-
         return sql_top_n_cat
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -433,7 +440,6 @@ def sql_bottom_n_cat_by(df, grouped_columns, n, spark, logger):
         """
 
         sql_bottom_n_cat = spark.sql(query)
-
         return sql_bottom_n_cat
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -476,7 +482,6 @@ def analyze_average_delay(df, column, delay_column, logger):
 
         avg_departure_delay_by_column = df.groupBy(column).agg(avg(col(delay_column)).alias(
             new_column_name)).orderBy(new_column_name, ascending=False)
-
         return avg_departure_delay_by_column
     except Exception as e:
         logger.error(f"An error occurred during data analysis: {str(e)}")
@@ -519,7 +524,6 @@ def analyze_positive_delay(df, column, delay_column, logger):
 
         avg_positive_delay_by_column = df.groupBy(column).agg(avg(when(col(delay_column) > 0, col(
             delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
-
         return avg_positive_delay_by_column
     except Exception as e:
         logger.error(f"An error occurred during data analysis: {str(e)}")
@@ -562,7 +566,6 @@ def analyze_negative_delay(df, column, delay_column, logger):
 
         avg_negative_delay_by_column = df.groupBy(column).agg(avg(when(col(delay_column) < 0, col(
             delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
-
         return avg_negative_delay_by_column
     except Exception as e:
         logger.error(f"An error occurred during data analysis: {str(e)}")
@@ -607,7 +610,6 @@ def numeric_stats(df, group_by_column, numeric_column, logger):
             min(numeric_column).alias(f"min_{numeric_column}"),
             max(numeric_column).alias(f"max_{numeric_column}")
         ).orderBy(f"average_{numeric_column}", ascending=False)
-
         return col_stats
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -650,7 +652,6 @@ def compute_flight_speed(df, distance, air_time, logger):
     try:
         df_add_speed = df.withColumn(
             "flight_speed (miles per hour)", (col(distance) / (col(air_time) / 60)))
-
         return df_add_speed
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -696,7 +697,6 @@ def shortest_n_flight_from_origin(df, origin_column, origin_name, measurement, n
 
         shortest_flight = origin.select(
             origin_column, measurement).orderBy(measurement, ascending=True).limit(n)
-
         return shortest_flight
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -742,7 +742,6 @@ def longest_n_flight_from_origin(df, origin_column, origin_name, measurement, n,
 
         longest_flight = origin.select(
             origin_column, measurement).orderBy(measurement, ascending=False).limit(n)
-
         return longest_flight
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -791,7 +790,6 @@ def average_duration(df, carrier_column, carrier_name, origin_column, origin_nam
 
         average_duration = origin.agg(
             avg(measurement).alias(f"average_{measurement} (mins)"))
-
         return average_duration
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -842,7 +840,6 @@ def total_duration(df, carrier_column, carrier_name, origin_column, origin_name,
 
         total_duration_hours = origin.agg(
             (sum(measurement) / 60).alias(f"total_{measurement} (hours)"))
-
         return total_duration_hours
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -872,101 +869,113 @@ def main():
     """
     logger = configure_logging()
     spark = create_spark_session()
+
     try:
         flights_data_frame = load_data(spark, logger, FLIGHTS_DATA_FILE_PATH)
+        logger.info("Sample rows in the df DataFrame:")
+        show_dataframe(flights_data_frame)
+        occurrence = flights_data_frame.count()
+        logger.info(f"There are {occurrence} number of df.\n")
+        logger.info(flights_data_frame.schema)
+
         clean_flights_data_df = process_missing_data(
             flights_data_frame, logger)
+        logger.info("Sample rows in the cleaned df DataFrame:")
+        show_dataframe(clean_flights_data_df)
+        clean_occurrence = clean_flights_data_df.count()
+        logger.info(
+            f"{clean_occurrence} rows remained after removing the rows with missing values.\n")
 
         flight_by_year_month = count_by(clean_flights_data_df, [
             "year", "month"], logger)
-        flight_by_year_month.show(5)
+        show_dataframe(flight_by_year_month)
 
         flight_by_day = count_by(clean_flights_data_df, ["day"], logger)
-        flight_by_day.show(5)
+        show_dataframe(flight_by_day)
 
         percentage_flight_by_carrier = percentage_by(
             clean_flights_data_df, ["carrier"], logger)
-        percentage_flight_by_carrier.show(5)
+        show_dataframe(percentage_flight_by_carrier)
 
         flights_by_origin = count_by(clean_flights_data_df, ["origin"], logger)
-        flights_by_origin.show(5)
+        show_dataframe(flights_by_origin)
 
         flights_by_dest = count_by(clean_flights_data_df, ["dest"], logger)
-        flights_by_dest.show(5)
+        show_dataframe(flights_by_dest)
 
         top_10_planes = top_n_cat_by(
             clean_flights_data_df, ["tailnum"], 10, logger)
-        top_10_planes.show()
+        show_dataframe(top_10_planes)
 
         flights_by_hour = count_by(clean_flights_data_df, ["hour"], logger)
-        flights_by_hour.show(5)
+        show_dataframe(flights_by_hour)
 
         avg_pos_dep_delay_by_carrier = analyze_positive_delay(
             clean_flights_data_df, "carrier", "dep_delay", logger)
-        avg_pos_dep_delay_by_carrier.show(5)
+        show_dataframe(avg_pos_dep_delay_by_carrier)
 
         avg_dep_delay_by_carrier = analyze_average_delay(
             clean_flights_data_df, "carrier", "dep_delay", logger)
-        avg_dep_delay_by_carrier.show(5)
+        show_dataframe(avg_dep_delay_by_carrier)
 
         avg_dep_delay_by_month = analyze_average_delay(
             clean_flights_data_df, "month", "dep_delay", logger)
-        avg_dep_delay_by_month.show(5)
+        show_dataframe(avg_dep_delay_by_month)
 
         avg_dep_delay_by_hour = analyze_average_delay(
             clean_flights_data_df, "hour", "dep_delay", logger)
-        avg_dep_delay_by_hour.show(5)
+        show_dataframe(avg_dep_delay_by_hour)
 
         avg_neg_dep_delay_by_carrier = analyze_negative_delay(
             clean_flights_data_df, "carrier", "dep_delay", logger)
-        avg_neg_dep_delay_by_carrier.show(5)
+        show_dataframe(avg_neg_dep_delay_by_carrier)
 
         avg_neg_dep_delay_by_month = analyze_negative_delay(
             clean_flights_data_df, "month", "dep_delay", logger)
-        avg_neg_dep_delay_by_month.show(5)
+        show_dataframe(avg_neg_dep_delay_by_month)
 
         avg_neg_dep_delay_by_hour = analyze_negative_delay(
             clean_flights_data_df, "hour", "dep_delay", logger)
-        avg_neg_dep_delay_by_hour.show(5)
+        show_dataframe(avg_neg_dep_delay_by_hour)
 
         distance_stats = numeric_stats(
             clean_flights_data_df, "carrier", "distance", logger)
-        distance_stats.show(5)
+        show_dataframe(distance_stats)
 
         transformed_01_df = compute_flight_speed(
             clean_flights_data_df, "distance", "air_time", logger)
-        transformed_01_df.show(5)
+        show_dataframe(transformed_01_df)
 
         speed_stats = numeric_stats(
             transformed_01_df, "carrier", "flight_speed (miles per hour)", logger)
-        speed_stats.show(5)
+        show_dataframe(speed_stats)
 
         shortest_flight_distance_PDX = shortest_n_flight_from_origin(
             transformed_01_df, "origin", "PDX", "distance", 1, logger)
-        shortest_flight_distance_PDX.show()
+        show_dataframe(shortest_flight_distance_PDX)
 
         longest_flight_distance_SEA = longest_n_flight_from_origin(
             transformed_01_df, "origin", "SEA", "distance", 1, logger)
-        longest_flight_distance_SEA.show()
+        show_dataframe(longest_flight_distance_SEA)
 
         average_duration_UA_SEA = average_duration(
             transformed_01_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
-        average_duration_UA_SEA.show()
+        show_dataframe(average_duration_UA_SEA)
 
         total_duration_UA_SEA = total_duration(
             transformed_01_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
-        total_duration_UA_SEA.show()
+        show_dataframe(total_duration_UA_SEA)
 
         planes_data_frame = load_data(spark, logger, PLANES_DATA_FILE_PATH)
 
         clean_planes_data_df = planes_data_frame.drop("speed")
         clean_planes_data_df = clean_planes_data_df.withColumnRenamed(
             "year", "plane_year")
-        clean_planes_data_df.show(5)
+        show_dataframe(clean_planes_data_df)
 
         flights_planes_df = transformed_01_df.join(
             clean_planes_data_df, on=["tailnum"], how="inner")
-        flights_planes_df.show(5)
+        show_dataframe(flights_planes_df)
         logger.info(flights_planes_df.count())
 
         clean_flights_planes_data_df = process_missing_data(
@@ -974,19 +983,19 @@ def main():
 
         top_20_flights_planes = top_n_cat_by(clean_flights_planes_data_df, [
             "carrier", "model", "plane_year"], 20, logger)
-        top_20_flights_planes.show()
+        show_dataframe(top_20_flights_planes)
 
         bottom_20_flights_planes = bottom_n_cat_by(clean_flights_planes_data_df, [
             "carrier", "model", "plane_year"], 20, logger)
-        bottom_20_flights_planes.show()
+        show_dataframe(bottom_20_flights_planes)
 
         sql_top_20_flights_planes = sql_top_n_cat_by(clean_flights_planes_data_df, [
             "carrier", "model", "plane_year"], 20, spark, logger)
-        sql_top_20_flights_planes.show()
+        show_dataframe(sql_top_20_flights_planes)
 
         sql_bottom_20_flights_planes = sql_bottom_n_cat_by(clean_flights_planes_data_df, [
             "carrier", "model", "plane_year"], 20, spark, logger)
-        sql_bottom_20_flights_planes.show()
+        show_dataframe(sql_bottom_20_flights_planes)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
