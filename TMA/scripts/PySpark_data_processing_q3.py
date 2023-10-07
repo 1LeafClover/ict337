@@ -74,7 +74,7 @@ def show_dataframe(df, max_rows=100, show_rows=20):
     Notes
     -----
     This function displays rows of the input DataFrame. If the DataFrame contains more
-    rows than the specified `max_rows`, it will limit the display to the first `max_rows`
+    rows than the specified `max_rows`, it will limit the display to the first `show_rows`
     rows. If the DataFrame has fewer rows than `max_rows`, it will display all available
     rows without truncation.
     """
@@ -168,11 +168,11 @@ def process_missing_data(df, logger):
         # Find and display rows with missing values
         missing_data_df = df.filter(filter_condition)
 
-        logger.info("Sample rows in the df DataFrame with Missing Value:")
+        logger.info("Sample rows in the DataFrame with Missing Value:")
         show_dataframe(missing_data_df)
         missing_occurrence = missing_data_df.count()
         logger.info(
-            f"There are {missing_occurrence} rows with missing values in df.\n")
+            f"There are {missing_occurrence} rows with missing values in DataFrame.\n")
 
         # Remove rows with missing values
         clean_data_df = df.filter(~filter_condition)
@@ -875,7 +875,7 @@ def main():
         logger.info("Sample rows in the df DataFrame:")
         show_dataframe(flights_data_frame)
         occurrence = flights_data_frame.count()
-        logger.info(f"There are {occurrence} number of df.\n")
+        logger.info(f"There are {occurrence} occurences in the DataFrame.\n")
         logger.info(flights_data_frame.schema)
 
         clean_flights_data_df = process_missing_data(
