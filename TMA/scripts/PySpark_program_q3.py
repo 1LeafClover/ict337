@@ -554,14 +554,14 @@ def analyze_negative_delay(df, column, delay_column, logger):
     Notes
     -----
     This function calculates the average negative departure/arrival delay for a specified column,
-    groups the data by another column, and orders the results in ascending order based on the average negative delay.
+    groups the data by another column, and orders the results in descending order based on the average negative delay.
     """
     try:
         suffix = delay_column.split('_')[0]
         new_column_name = f"average_negative_{suffix}_delay"
 
         avg_negative_delay_by_column = df.groupBy(column).agg(avg(when(col(delay_column) < 0, col(
-            delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=True)
+            delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
 
         return avg_negative_delay_by_column
     except Exception as e:
