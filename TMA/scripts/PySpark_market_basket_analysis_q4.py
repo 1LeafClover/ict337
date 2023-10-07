@@ -122,7 +122,7 @@ def load_data(sc, logger, file_path):
         raise e
 
 
-def cleanse(rdd):
+def cleanse(rdd, logger):
     try:
         cleansed_rdd = rdd.map(
             lambda x: [item.strip().lower() for item in x.split(',')])
@@ -132,7 +132,7 @@ def cleanse(rdd):
         raise e
 
 
-def find_transaction_with_most_items(rdd):
+def find_transaction_with_most_items(rdd, logger):
     try:
         transaction_counts = rdd.map(lambda items: (items, len(items)))
         max_transaction = transaction_counts.max(key=lambda x: x[1])
@@ -144,11 +144,45 @@ def find_transaction_with_most_items(rdd):
         raise e
 
 
-def count_unique_items(rdd):
+def count_unique_items(rdd, logger):
     try:
         unique_items = rdd.flatMap(lambda items: items).distinct()
         count = unique_items.count()
         return count
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def top_n_item(rdd, n, logger):
+    try:
+        item_count = rdd.flatMap(lambda items: items).countByValue().items()
+        sorted_item_count = sorted(
+            item_count, key=(lambda x: x[1]), reverse=True)
+
+        top_item = sorted_item_count[:n]
+        total_transaction = rdd.count()
+        top_items_with_percentage = [
+            (item, count, (count / total_transaction)) for item, count in top_item]
+
+        return top_items_with_percentage
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def bottom_n_item(rdd, n, logger):
+    try:
+        item_count = rdd.flatMap(lambda items: items).countByValue().items()
+        sorted_item_count = sorted(
+            item_count, key=(lambda x: x[1]), reverse=True)
+
+        bottom_item = sorted_item_count[-n:]
+        total_transaction = rdd.count()
+        bottom_items_with_percentage = [
+            (item, count, (count / total_transaction)) for item, count in bottom_item]
+
+        return bottom_items_with_percentage
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -181,17 +215,25 @@ def main():
     try:
         grocery_rdd = load_data(sc, logger, GROCERY_DATA_FILE_PATH)
 
-        cleansed_grocery_rdd = cleanse(grocery_rdd)
+        cleansed_grocery_rdd = cleanse(grocery_rdd, logger)
         show_rdd(cleansed_grocery_rdd, logger)
         occurrence = cleansed_grocery_rdd.count()
         logger.info(f"There are {occurrence} transactions in the rdd.\n")
 
-        most_groceries = find_transaction_with_most_items(cleansed_grocery_rdd)
+        most_groceries = find_transaction_with_most_items(
+            cleansed_grocery_rdd, logger)
         logger.info(most_groceries)
 
-        unique_groceries_count = count_unique_items(cleansed_grocery_rdd)
+        unique_groceries_count = count_unique_items(
+            cleansed_grocery_rdd, logger)
         logger.info(
             f"There are {unique_groceries_count} unique items in the rdd.\n")
+
+        top_20_items = top_n_item(cleansed_grocery_rdd, 20, logger)
+        logger.info(top_20_items)
+
+        bottom_20_items = bottom_n_item(cleansed_grocery_rdd, 20, logger)
+        logger.info(bottom_20_items)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
