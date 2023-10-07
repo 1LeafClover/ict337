@@ -1,0 +1,23 @@
+# Ignore Python cache files
+/TMA/validation
+/TMA/scripts/__pycache__
+/ECA/validation
+/ECA/scripts/__pycache__
+
+# Ignore everything
+*
+
+# But not these files...
+!.gitignore
+!/TMA/*
+!*/
+
+# Include TMA and its contents
+!/TMA/data/*
+!/TMA/docs/*
+!/TMA/scripts/*
+
+# Include ECA and its contents
+!/ECA/data/*
+!/ECA/docs/*
+!/ECA/scripts/*
