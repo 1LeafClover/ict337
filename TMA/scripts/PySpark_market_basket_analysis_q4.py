@@ -188,6 +188,57 @@ def bottom_n_item(rdd, n, logger):
         raise e
 
 
+def add_index(rdd, logger):
+    try:
+        indexed_rdd = rdd.zipWithIndex()
+
+        return indexed_rdd
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def generate_combinations(rdd, logger):
+    try:
+        items, index = rdd
+        n = len(items)
+        combinations = []
+        for i in range(n):
+            for j in range(i + 1, n):
+                item_pair = (items[i], items[j])
+                sorted_item_pair = tuple(sorted(item_pair))
+                combinations.append((sorted_item_pair, index))
+
+        return combinations
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def association(rdd, logger):
+    try:
+        transaction_indices = rdd.groupByKey().map(
+            lambda x: (x[0], list(x[1]))).collect()
+
+        return (transaction_indices)
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def item_pair_counts(rdd, logger):
+    try:
+        item_pair_counts = rdd.countByKey()
+
+        sorted_item_pair_counts = sorted(
+            item_pair_counts.items(), key=lambda x: x[1], reverse=True)
+
+        return sorted_item_pair_counts
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
 def main():
     """Entry point of the script.
 
@@ -234,6 +285,21 @@ def main():
 
         bottom_20_items = bottom_n_item(cleansed_grocery_rdd, 20, logger)
         logger.info(bottom_20_items)
+
+        indexed_grocery_rdd = add_index(cleansed_grocery_rdd, logger)
+        show_rdd(indexed_grocery_rdd, logger)
+
+        combination_2item = indexed_grocery_rdd.flatMap(
+            lambda items: generate_combinations(items, logger))
+        show_rdd(combination_2item, logger)
+        occurrence = combination_2item .count()
+        logger.info(f"There are {occurrence} item pairs in the rdd.\n")
+
+        associated_transaction = association(combination_2item, logger)
+        logger.info(associated_transaction[:20])
+
+        sorted_associated_count = item_pair_counts(combination_2item, logger)
+        logger.info(sorted_associated_count[:20])
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
