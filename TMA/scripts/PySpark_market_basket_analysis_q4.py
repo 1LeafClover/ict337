@@ -342,11 +342,12 @@ def main():
         logger.info(sorted_associated_count[:20])
         sorted_associated_count2 = sc.parallelize(sorted_associated_count)
 
-        occurrence = combination_2item.count()
+        total_transaction = cleansed_grocery_rdd.count()
         item_pair_support = support(
-            sorted_associated_count, occurrence, logger)
+            sorted_associated_count, total_transaction, logger)
         logger.info(item_pair_support[:20])
-        logger.info(f"There are {occurrence} total number of transactions.\n")
+        occurrence = len(item_pair_support)
+        logger.info(f"There are {occurrence} total number of records.\n")
 
         top_20_item_pairs = top_n_item_pair_with_support(
             item_pair_support, 20, logger)
