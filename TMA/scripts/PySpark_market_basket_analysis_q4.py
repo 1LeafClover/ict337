@@ -154,7 +154,7 @@ def count_unique_items(rdd, logger):
         raise e
 
 
-def top_n_item(rdd, n, logger):
+def top_n_item_percentage(rdd, n, logger):
     try:
         item_count = rdd.flatMap(lambda items: items).countByValue().items()
         sorted_item_count = sorted(
@@ -171,7 +171,7 @@ def top_n_item(rdd, n, logger):
         raise e
 
 
-def bottom_n_item(rdd, n, logger):
+def bottom_n_item_percentage(rdd, n, logger):
     try:
         item_count = rdd.flatMap(lambda items: items).countByValue().items()
         sorted_item_count = sorted(
