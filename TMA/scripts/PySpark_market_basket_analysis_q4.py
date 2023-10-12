@@ -239,6 +239,42 @@ def item_pair_counts(rdd, logger):
         raise e
 
 
+def support(item_pair_counts, total_transactions, logger):
+    try:
+        item_pair_support = []
+
+        for item_pair, count in item_pair_counts:
+            support_percentage = (count / total_transactions) * 100
+            item_pair_support.append((item_pair, (count, support_percentage)))
+
+        return item_pair_support
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def top_n_item_pair_with_support(lst, n, logger):
+    try:
+        sorted_items = sorted(lst, key=lambda x: x[1][0], reverse=True)
+        top_items_with_support = sorted_items[:n]
+
+        return top_items_with_support
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def bottom_n_item_pair_with_support(lst, n, logger):
+    try:
+        sorted_items = sorted(lst, key=lambda x: x[1][0], reverse=False)
+        bottom_items_with_support = sorted_items[:n]
+
+        return bottom_items_with_support
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
 def main():
     """Entry point of the script.
 
@@ -280,11 +316,11 @@ def main():
         logger.info(
             f"There are {unique_groceries_count} unique items in the rdd.\n")
 
-        top_20_items = top_n_item(cleansed_grocery_rdd, 20, logger)
-        logger.info(top_20_items)
+        # top_20_items = top_n_item(cleansed_grocery_rdd, 20, logger)
+        # logger.info(top_20_items)
 
-        bottom_20_items = bottom_n_item(cleansed_grocery_rdd, 20, logger)
-        logger.info(bottom_20_items)
+        # bottom_20_items = bottom_n_item(cleansed_grocery_rdd, 20, logger)
+        # logger.info(bottom_20_items)
 
         indexed_grocery_rdd = add_index(cleansed_grocery_rdd, logger)
         show_rdd(indexed_grocery_rdd, logger)
@@ -292,7 +328,7 @@ def main():
         combination_2item = indexed_grocery_rdd.flatMap(
             lambda items: generate_combinations(items, logger))
         show_rdd(combination_2item, logger)
-        occurrence = combination_2item .count()
+        occurrence = combination_2item.count()
         logger.info(f"There are {occurrence} item pairs in the rdd.\n")
 
         associated_transaction = association(combination_2item, logger)
@@ -300,6 +336,21 @@ def main():
 
         sorted_associated_count = item_pair_counts(combination_2item, logger)
         logger.info(sorted_associated_count[:20])
+        sorted_associated_count2 = sc.parallelize(sorted_associated_count)
+
+        occurrence = combination_2item.count()
+        item_pair_support = support(
+            sorted_associated_count, occurrence, logger)
+        logger.info(item_pair_support[:20])
+        logger.info(f"There are {occurrence} total number of transactions.\n")
+
+        top_20_item_pairs = top_n_item_pair_with_support(
+            item_pair_support, 20, logger)
+        logger.info(top_20_item_pairs)
+
+        bottom_20_item_pairs = bottom_n_item_pair_with_support(
+            item_pair_support, 20, logger)
+        logger.info(bottom_20_item_pairs)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
