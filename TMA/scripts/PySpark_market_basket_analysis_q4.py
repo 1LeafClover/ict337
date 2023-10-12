@@ -154,16 +154,17 @@ def count_unique_items(rdd, logger):
         raise e
 
 
-def top_n_item_percentage(rdd, n, logger):
+def top_n_item_with_percentage(rdd, n, logger):
     try:
-        item_count = rdd.flatMap(lambda items: items).countByValue().items()
+        item = rdd.flatMap(lambda items: items)
+        item_count = item.countByValue().items()
         sorted_item_count = sorted(
             item_count, key=(lambda x: x[1]), reverse=True)
 
         top_item = sorted_item_count[:n]
-        total_transaction = rdd.count()
+        total_transaction = item.count()
         top_items_with_percentage = [
-            (item, count, (count / total_transaction)) for item, count in top_item]
+            (item, count, ((count / total_transaction) * 100)) for item, count in top_item]
 
         return top_items_with_percentage
     except Exception as e:
@@ -171,16 +172,17 @@ def top_n_item_percentage(rdd, n, logger):
         raise e
 
 
-def bottom_n_item_percentage(rdd, n, logger):
+def bottom_n_item_with_percentage(rdd, n, logger):
     try:
-        item_count = rdd.flatMap(lambda items: items).countByValue().items()
+        item = rdd.flatMap(lambda items: items)
+        item_count = item.countByValue().items()
         sorted_item_count = sorted(
-            item_count, key=(lambda x: x[1]), reverse=True)
+            item_count, key=(lambda x: x[1]), reverse=False)
 
-        bottom_item = sorted_item_count[-n:]
-        total_transaction = rdd.count()
+        bottom_item = sorted_item_count[:n]
+        total_transaction = item.count()
         bottom_items_with_percentage = [
-            (item, count, (count / total_transaction)) for item, count in bottom_item]
+            (item, count, ((count / total_transaction) * 100)) for item, count in bottom_item]
 
         return bottom_items_with_percentage
     except Exception as e:
@@ -280,10 +282,12 @@ def main():
         logger.info(
             f"There are {unique_groceries_count} unique items in the rdd.\n")
 
-        top_20_items = top_n_item(cleansed_grocery_rdd, 20, logger)
+        top_20_items = top_n_item_with_percentage(
+            cleansed_grocery_rdd, 20, logger)
         logger.info(top_20_items)
 
-        bottom_20_items = bottom_n_item(cleansed_grocery_rdd, 20, logger)
+        bottom_20_items = bottom_n_item_with_percentage(
+            cleansed_grocery_rdd, 20, logger)
         logger.info(bottom_20_items)
 
         indexed_grocery_rdd = add_index(cleansed_grocery_rdd, logger)
