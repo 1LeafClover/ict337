@@ -220,9 +220,9 @@ def generate_combinations(rdd, logger):
 def association(rdd, logger):
     try:
         transaction_indices = rdd.groupByKey().map(
-            lambda x: (x[0], list(x[1]))).collect()
+            lambda x: (x[0], list(x[-1]))).collect()
 
-        return (transaction_indices)
+        return transaction_indices
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -272,6 +272,20 @@ def bottom_n_item_pair_with_support(lst, n, logger):
         bottom_items_with_support = sorted_items[:n]
 
         return bottom_items_with_support
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
+def antecedent_count(transactions_rdd, logger):
+    try:
+        item_frequencies = transactions_rdd.flatMap(
+            lambda transaction: [(item, 1) for item in transaction])
+        item_frequency_counts = item_frequencies.reduceByKey(
+            lambda x, y: x + y)
+        sorted_item_frequency_counts = item_frequency_counts.sortBy(
+            lambda x: x[1], ascending=False)
+        return sorted_item_frequency_counts
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -358,6 +372,28 @@ def main():
         bottom_20_item_pairs = bottom_n_item_pair_with_support(
             item_pair_support, 20, logger)
         logger.info(bottom_20_item_pairs)
+
+        indexed_grocery_rdd = add_index(cleansed_grocery_rdd, logger)
+        show_rdd(indexed_grocery_rdd, logger)
+
+        permutation_2item = indexed_grocery_rdd.flatMap(
+            lambda items: generate_combinations(items, logger))
+        show_rdd(permutation_2item, logger)
+        occurrence = permutation_2item.count()
+        logger.info(f"There are {occurrence} number of records.\n")
+
+        associated_transaction = association(permutation_2item, logger)
+        logger.info(associated_transaction[:20])
+        occurrence = len(associated_transaction)
+        logger.info(f"There are {occurrence} number of records.\n")
+
+        sorted_associated_count = item_pair_counts(permutation_2item, logger)
+        logger.info(sorted_associated_count[:20])
+        occurrence = len(sorted_associated_count)
+        logger.info(f"There are {occurrence} number of records.\n")
+
+        frequency_x = antecedent_count(cleansed_grocery_rdd, logger)
+        show_rdd(frequency_x, logger)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
