@@ -327,20 +327,22 @@ def main():
         logger.info(bottom_20_items)
 
         indexed_grocery_rdd = add_index(cleansed_grocery_rdd, logger)
-        show_rdd(indexed_grocery_rdd, logger)
 
         combination_2item = indexed_grocery_rdd.flatMap(
             lambda items: generate_combinations(items, logger))
         show_rdd(combination_2item, logger)
         occurrence = combination_2item.count()
-        logger.info(f"There are {occurrence} item pairs in the rdd.\n")
+        logger.info(f"There are {occurrence} number of records.\n")
 
         associated_transaction = association(combination_2item, logger)
         logger.info(associated_transaction[:20])
+        occurrence = len(associated_transaction)
+        logger.info(f"There are {occurrence} number of records.\n")
 
         sorted_associated_count = item_pair_counts(combination_2item, logger)
         logger.info(sorted_associated_count[:20])
-        sorted_associated_count2 = sc.parallelize(sorted_associated_count)
+        occurrence = len(sorted_associated_count)
+        logger.info(f"There are {occurrence} number of records.\n")
 
         total_transaction = cleansed_grocery_rdd.count()
         item_pair_support = support(
