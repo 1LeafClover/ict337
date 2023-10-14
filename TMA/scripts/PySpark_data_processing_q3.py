@@ -23,8 +23,8 @@ def configure_logging():
 
     Notes
     -----
-    This function initializes the logging settings, including the logging level,
-    and returns a logger object that can be used for logging messages within the application.
+    This function returns a logger object that may be used to log messages
+    inside the program and initializes the logging parameters, including the logging level.
 
     The default logging level is set to the value of the constant LOGGING_LEVEL.
     """
@@ -67,16 +67,18 @@ def show_dataframe(df, max_rows=100, show_rows=20):
     max_rows : int, optional
         The maximum number of rows to display. Default is 20.
 
+    show_rows : int, optional
+        The rows to display if records is above max rows. 
+
     Returns
     -------
     None
 
     Notes
     -----
-    This function displays rows of the input DataFrame. If the DataFrame contains more
-    rows than the specified `max_rows`, it will limit the display to the first `show_rows`
-    rows. If the DataFrame has fewer rows than `max_rows`, it will display all available
-    rows without truncation.
+    This function shows the rows from the DataFrame input.
+    The DataFrame will only display the first "show_rows" rows if there are more rows than the specified "max_rows".
+    The DataFrame will display all available rows without truncation if the number of rows is less than "max_rows".
     """
     if df.count() > max_rows:
         df.show(show_rows)
@@ -149,23 +151,23 @@ def process_missing_data(df, logger):
 
     Notes
     -----
-    This function checks for missing values in the columns of the input DataFrame, identifies and displays
-    rows with missing values, and removes those rows from the DataFrame. It provides information about
-    the number of missing values, the resulting cleaned DataFrame, and any errors encountered during
-    the process.
+    This function determines which rows in the supplied DataFrame have missing values,
+    displays those rows, and removes them from the DataFrame. It details the total number of missing values,
+    the cleaned DataFrame that is produced, and any problems that may have occurred.
     """
     try:
-        # Check for missing values in columns
         columns_to_check = df.columns
         filter_condition = None
 
+        # Loop through the list of columns and build a filter condition to check for null values.
         for column_name in columns_to_check:
+            # Create a new condition to check if the column is null
             if filter_condition is None:
                 filter_condition = col(column_name).isNull()
+            # For subsequent columns, update the filter condition to include a check for null values
             else:
                 filter_condition = filter_condition | col(column_name).isNull()
 
-        # Find and display rows with missing values
         missing_data_df = df.filter(filter_condition)
 
         logger.info("Sample rows in the DataFrame with Missing Value:")
@@ -174,7 +176,6 @@ def process_missing_data(df, logger):
         logger.info(
             f"There are {missing_occurrence} rows with missing values in DataFrame.\n")
 
-        # Remove rows with missing values
         clean_data_df = df.filter(~filter_condition)
         return clean_data_df
     except Exception as e:
@@ -207,9 +208,9 @@ def count_by(df, grouped_columns, logger):
 
     Notes
     -----
-    This function groups the data in the input DataFrame by the specified columns and counts the
-    occurrences of rows within each group. The result is a DataFrame containing counts, sorted in
-    descending order based on the count values.
+    This function divides the data in the input DataFrame into groups according to the chosen columns,
+    then counts the number of rows in each group. The outcome is a DataFrame with counts that is
+    sorted in decreasing order according to the count values.
     """
     try:
         count_by_col = df.groupby(*grouped_columns).count()
@@ -245,10 +246,9 @@ def percentage_by(df, grouped_columns, logger):
 
     Notes
     -----
-    This function groups the data in the input DataFrame by the specified columns and calculates
-    the number and percentage of occurrences within each group relative to the total number of rows in the
-    DataFrame. The result is a DataFrame containing both counts and percentages, sorted in
-    descending order based on the percentage values.
+    The function computes the number and percentage of occurrences within each group relative
+    to the total number of rows in the DataFrame for the data in the input DataFrame, which is organized by the provided columns.
+    The outcome is a DataFrame that is sorted in decreasing order using the percentage values and includes both counts and percentages.
     """
     try:
         total_flights = df.count()
@@ -289,9 +289,8 @@ def top_n_cat_by(df, grouped_columns, n, logger):
 
     Notes
     -----
-    This function groups the data in the specified DataFrame by the specified columns and counts
-    the occurrences of each category. It returns a DataFrame containing the top n categories
-    with the highest counts, sorted in descending order based on the count values.
+    This function groups data from the specified DataFrame by the specified columns and counts the number of occurrences of each category.
+    It returns a DataFrame containing the top n categories with the highest counts, sorted in descending order based on count values.
     """
     try:
         top_cat = df.groupBy(*grouped_columns).count().orderBy(
@@ -329,9 +328,8 @@ def bottom_n_cat_by(df, grouped_columns, n, logger):
 
     Notes
     -----
-    This function groups the data in the specified DataFrame by the specified columns and counts
-    the occurrences of each category. It returns a DataFrame containing the bottom n categories
-    with the highest counts, sorted in ascending order based on the count values.
+    This function groups data from the specified DataFrame by the specified columns and counts the number of occurrences of each category.
+    It returns a DataFrame containing the last n categories with the highest number, sorted in ascending order based on count values.
     """
     try:
         bottom_cat = df.groupBy(*grouped_columns).count().orderBy(
@@ -371,9 +369,8 @@ def sql_top_n_cat_by(df, grouped_columns, n, spark, logger):
 
     Notes
     -----
-    This function groups the data in the specified DataFrame by the specified columns and counts
-    the occurrences of each category. It returns a DataFrame containing the top n categories
-    with the highest counts, sorted in descending order based on the count values.
+    This function groups data from the specified DataFrame by the specified columns and counts the number of occurrences of each category.
+    It returns a DataFrame containing the top n categories with the highest counts, sorted in descending order based on count values.
     """
     try:
         df.createOrReplaceTempView("top_flights_planes")
@@ -423,9 +420,8 @@ def sql_bottom_n_cat_by(df, grouped_columns, n, spark, logger):
 
     Notes
     -----
-    This function groups the data in the specified DataFrame by the specified columns and counts
-    the occurrences of each category. It returns a DataFrame containing the bottom n categories
-    with the highest counts, sorted in ascending order based on the count values.
+    This function groups data from the specified DataFrame by the specified columns and counts the number of occurrences of each category.
+    It returns a DataFrame containing the last n categories with the highest number, sorted in ascending order based on count values.
     """
     try:
         df.createOrReplaceTempView("bottom_flights_planes")
@@ -474,7 +470,7 @@ def analyze_average_delay(df, column, delay_column, logger):
     Notes
     -----
     This function calculates the average departure/arrival delay for a specified column,
-    groups the data by another column, and orders the results in descending order based on the average delay.
+    groups the data by another column,and ranks the results in descending order based on the average delay.
     """
     try:
         suffix = delay_column.split('_')[0]
@@ -516,12 +512,13 @@ def analyze_positive_delay(df, column, delay_column, logger):
     Notes
     -----
     This function calculates the average positive departure/arrival delay for a specified column,
-    groups the data by another column, and orders the results in descending order based on the average positive delay.
+    groups the data by another column, and ranks the results in descending order based on the average positive delay.
     """
     try:
         suffix = delay_column.split('_')[0]
         new_column_name = f"average_positive_{suffix}_delay"
 
+        # Filter for positive delay values before computing the average.
         avg_positive_delay_by_column = df.groupBy(column).agg(avg(when(col(delay_column) > 0, col(
             delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
         return avg_positive_delay_by_column
@@ -557,13 +554,14 @@ def analyze_negative_delay(df, column, delay_column, logger):
 
     Notes
     -----
-    This function calculates the average negative departure/arrival delay for a specified column,
-    groups the data by another column, and orders the results in descending order based on the average negative delay.
+    This function calculates the average  departure/arrival delay for a specified column,
+    groups the data by another column, and ranks the results in descending order based on the average delay.
     """
     try:
         suffix = delay_column.split('_')[0]
         new_column_name = f"average_negative_{suffix}_delay"
 
+        # Filter for negative delay values before computing the average.
         avg_negative_delay_by_column = df.groupBy(column).agg(avg(when(col(delay_column) < 0, col(
             delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
         return avg_negative_delay_by_column
@@ -600,9 +598,9 @@ def numeric_stats(df, group_by_column, numeric_column, logger):
 
     Notes
     -----
-    1. This function calculates statistics (average, minimum, maximum) for a specified numeric column in the DataFrame.
-    2. The statistics are computed based on groups formed by the values in the specified 'group_by_column.'
-    3. The resulting DataFrame is ordered in descending order of the average of the numeric column.
+    This function calculates statistics (average, minimum, maximum) for a specified numeric column in the DataFrame.
+    The statistics are computed based on groups formed by the values in the specified 'group_by_column.'
+    The resulting DataFrame is ordered in descending order of the average of the numeric column.
     """
     try:
         col_stats = df.groupBy(group_by_column).agg(
