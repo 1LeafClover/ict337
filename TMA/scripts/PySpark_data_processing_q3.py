@@ -870,7 +870,7 @@ def main():
 
     try:
         flights_data_frame = load_data(spark, logger, FLIGHTS_DATA_FILE_PATH)
-        logger.info("Sample rows in the df DataFrame:")
+        logger.info("Sample rows in the flights DataFrame:")
         show_dataframe(flights_data_frame)
         occurrence = flights_data_frame.count()
         logger.info(f"There are {occurrence} occurences in the DataFrame.\n")
@@ -878,7 +878,7 @@ def main():
 
         clean_flights_data_df = process_missing_data(
             flights_data_frame, logger)
-        logger.info("Sample rows in the cleaned df DataFrame:")
+        logger.info("Sample rows in the cleaned flights DataFrame:")
         show_dataframe(clean_flights_data_df)
         clean_occurrence = clean_flights_data_df.count()
         logger.info(
@@ -940,44 +940,55 @@ def main():
             clean_flights_data_df, "carrier", "distance", logger)
         show_dataframe(distance_stats)
 
-        transformed_01_df = compute_flight_speed(
+        transformed_flights_df = compute_flight_speed(
             clean_flights_data_df, "distance", "air_time", logger)
-        show_dataframe(transformed_01_df)
+        show_dataframe(transformed_flights_df)
 
         speed_stats = numeric_stats(
-            transformed_01_df, "carrier", "flight_speed (miles per hour)", logger)
+            transformed_flights_df, "carrier", "flight_speed (miles per hour)", logger)
         show_dataframe(speed_stats)
 
         shortest_flight_distance_PDX = shortest_n_flight_from_origin(
-            transformed_01_df, "flight", "origin", "PDX", "distance", 1, logger)
+            transformed_flights_df, "flight", "origin", "PDX", "distance", 1, logger)
         show_dataframe(shortest_flight_distance_PDX)
 
         longest_flight_distance_SEA = longest_n_flight_from_origin(
-            transformed_01_df, "flight", "origin", "SEA", "air_time", 1, logger)
+            transformed_flights_df, "flight", "origin", "SEA", "air_time", 1, logger)
         show_dataframe(longest_flight_distance_SEA)
 
         average_duration_UA_SEA = average_duration(
-            transformed_01_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
+            transformed_flights_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
         show_dataframe(average_duration_UA_SEA)
 
         total_duration_UA_SEA = total_duration(
-            transformed_01_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
+            transformed_flights_df, "carrier", "UA", "origin", "SEA", "air_time", logger)
         show_dataframe(total_duration_UA_SEA)
 
         planes_data_frame = load_data(spark, logger, PLANES_DATA_FILE_PATH)
+        logger.info("Sample rows in the planes DataFrame:")
+        show_dataframe(planes_data_frame)
+        occurrence = planes_data_frame.count()
+        logger.info(f"There are {occurrence} occurences in the DataFrame.\n")
+        logger.info(planes_data_frame.schema)
 
         clean_planes_data_df = planes_data_frame.drop("speed")
         clean_planes_data_df = clean_planes_data_df.withColumnRenamed(
             "year", "plane_year")
         show_dataframe(clean_planes_data_df)
 
-        flights_planes_df = transformed_01_df.join(
+        flights_planes_df = transformed_flights_df.join(
             clean_planes_data_df, on=["tailnum"], how="inner")
         show_dataframe(flights_planes_df)
-        logger.info(flights_planes_df.count())
+        occurrence = flights_planes_df.count()
+        logger.info(f"There are {occurrence} occurences in the DataFrame.\n")
 
         clean_flights_planes_data_df = process_missing_data(
             flights_planes_df, logger)
+        logger.info("Sample rows in the cleaned planes DataFrame:")
+        show_dataframe(clean_flights_planes_data_df)
+        clean_occurrence = clean_flights_planes_data_df.count()
+        logger.info(
+            f"{clean_occurrence} rows remained after removing the rows with missing values.\n")
 
         top_20_flights_planes = top_n_cat_by(clean_flights_planes_data_df, [
             "carrier", "model", "plane_year"], 20, logger)
