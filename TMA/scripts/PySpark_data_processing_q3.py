@@ -656,7 +656,7 @@ def compute_flight_speed(df, distance, air_time, logger):
         raise e
 
 
-def shortest_n_flight_from_origin(df, origin_column, origin_name, measurement, n, logger):
+def shortest_n_flight_from_origin(df, flight_column, origin_column, origin_name, measurement, n, logger):
     """
     Find the shortest 'n' flights from a specific origin based on a measurement.
 
@@ -694,14 +694,14 @@ def shortest_n_flight_from_origin(df, origin_column, origin_name, measurement, n
         origin = df.filter(df[origin_column] == origin_name)
 
         shortest_flight = origin.select(
-            origin_column, measurement).orderBy(measurement, ascending=True).limit(n)
+            flight_column, origin_column, measurement).orderBy(measurement, ascending=True).limit(n)
         return shortest_flight
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
 
 
-def longest_n_flight_from_origin(df, origin_column, origin_name, measurement, n, logger):
+def longest_n_flight_from_origin(df, flight_column, origin_column, origin_name, measurement, n, logger):
     """
     Find the longest 'n' flights from a specific origin based on a measurement.
 
@@ -739,7 +739,7 @@ def longest_n_flight_from_origin(df, origin_column, origin_name, measurement, n,
         origin = df.filter(df[origin_column] == origin_name)
 
         longest_flight = origin.select(
-            origin_column, measurement).orderBy(measurement, ascending=False).limit(n)
+            flight_column, origin_column, measurement).orderBy(measurement, ascending=False).limit(n)
         return longest_flight
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
@@ -786,7 +786,7 @@ def average_duration(df, carrier_column, carrier_name, origin_column, origin_nam
         carrier = df.filter(df[carrier_column] == carrier_name)
         origin = carrier.filter(df[origin_column] == origin_name)
 
-        average_duration = origin.agg(
+        average_duration = origin.groupBy(df[carrier_column], df[origin_column]).agg(
             avg(measurement).alias(f"average_{measurement} (mins)"))
         return average_duration
     except Exception as e:
@@ -836,7 +836,7 @@ def total_duration(df, carrier_column, carrier_name, origin_column, origin_name,
         carrier = df.filter(df[carrier_column] == carrier_name)
         origin = carrier.filter(df[origin_column] == origin_name)
 
-        total_duration_hours = origin.agg(
+        total_duration_hours = origin.groupBy(df[carrier_column], df[origin_column]).agg(
             (sum(measurement) / 60).alias(f"total_{measurement} (hours)"))
         return total_duration_hours
     except Exception as e:
@@ -949,11 +949,11 @@ def main():
         show_dataframe(speed_stats)
 
         shortest_flight_distance_PDX = shortest_n_flight_from_origin(
-            transformed_01_df, "origin", "PDX", "distance", 1, logger)
+            transformed_01_df, "flight", "origin", "PDX", "distance", 1, logger)
         show_dataframe(shortest_flight_distance_PDX)
 
         longest_flight_distance_SEA = longest_n_flight_from_origin(
-            transformed_01_df, "origin", "SEA", "distance", 1, logger)
+            transformed_01_df, "flight", "origin", "SEA", "air_time", 1, logger)
         show_dataframe(longest_flight_distance_SEA)
 
         average_duration_UA_SEA = average_duration(
