@@ -65,10 +65,10 @@ def show_dataframe(df, max_rows=100, show_rows=20):
         The DataFrame to be displayed.
 
     max_rows : int, optional
-        The maximum number of rows to display. Default is 20.
+        The maximum number of rows to display. Default is 100.
 
     show_rows : int, optional
-        The rows to display if records is above max rows. 
+        The rows to display if records is above max rows. Default is 20.
 
     Returns
     -------
