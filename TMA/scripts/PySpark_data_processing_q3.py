@@ -519,7 +519,7 @@ def analyze_positive_delay(df, column, delay_column, logger):
         new_column_name = f"average_positive_{suffix}_delay"
 
         # Filter for positive delay values before computing the average.
-        avg_positive_delay_by_column = df.groupBy(column).agg(avg(when(col(delay_column) > 0, col(
+        avg_positive_delay_by_column = df.groupBy(column).agg(avg(when(col(delay_column) >= 0, col(
             delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
         return avg_positive_delay_by_column
     except Exception as e:
@@ -916,13 +916,13 @@ def main():
             clean_flights_data_df, "carrier", "dep_delay", logger)
         show_dataframe(avg_dep_delay_by_carrier)
 
-        avg_dep_delay_by_month = analyze_average_delay(
+        avg_pos_delay_by_month = analyze_positive_delay(
             clean_flights_data_df, "month", "dep_delay", logger)
-        show_dataframe(avg_dep_delay_by_month)
+        show_dataframe(avg_pos_delay_by_month)
 
-        avg_dep_delay_by_hour = analyze_average_delay(
+        avg_pos_delay_by_hour = analyze_positive_delay(
             clean_flights_data_df, "hour", "dep_delay", logger)
-        show_dataframe(avg_dep_delay_by_hour)
+        show_dataframe(avg_pos_delay_by_hour)
 
         avg_neg_dep_delay_by_carrier = analyze_negative_delay(
             clean_flights_data_df, "carrier", "dep_delay", logger)
