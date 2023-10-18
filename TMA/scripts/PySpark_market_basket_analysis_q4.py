@@ -400,7 +400,10 @@ def generate_combinations(indexed_rdd, logger):
             # Ensure item1 is less than item2 (in alphabetical order) to avoid duplicate pairs
             if item1 < item2
         ])
-        return item_combinations_rdd
+
+        sorted_item_combinations_rdd = item_combinations_rdd.sortBy(
+            lambda x: (x[1], x[0]))
+        return sorted_item_combinations_rdd
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -591,53 +594,14 @@ def bottom_n_item_pair_with_support(support_rdd, n, logger):
         raise e
 
 
-def term_frequency(cleansed_rdd, logger):
-    """
-    Calculate the term frequency of items in transactions.
-
-    Parameters
-    ----------
-    cleansed_rdd : RDD
-        RDD containing cleansed transaction data.
-
-    logger : object
-        Logger object for logging messages.
-
-    Returns
-    -------
-    RDD
-        RDD containing term frequency information for each item in the transactions.
-
-    Raises
-    ------
-    Exception
-        If an error occurs during the process, an exception is raised.
-
-    Notes
-    -----
-    This function calculates the term frequency of items in each transaction within the RDD.
-    Term frequency is the number of times each item appears in each transaction.
-    The result is an RDD containing (item, transaction index, term frequency) tuples.
-    """
-    try:
-        indexed_transactions_rdd = cleansed_rdd.zipWithIndex()
-        term_frequencies = indexed_transactions_rdd.flatMap(lambda x: [
-            (item, x[1], x[0].count(item)) for item in x[0]
-        ])
-        return term_frequencies
-    except Exception as e:
-        logger.error(f"An error occurred: {str(e)}")
-        raise e
-
-
-def generate_permutations(term_frequency_rdd, logger):
+def generate_permutations(indexed_rdd, logger):
     """
     Generate all permutations of item pairs within each transaction.
 
     Parameters
     ----------
-    term_frequency_rdd : RDD
-        RDD containing term frequency information for items in transactions.
+    indexed_rdd : RDD
+        RDD containing indexed transactions, each as a list of items and a transaction index.
 
     logger : object
         Logger object for logging messages.
@@ -655,30 +619,28 @@ def generate_permutations(term_frequency_rdd, logger):
     Notes
     -----
     This function generates all possible permutations of item pairs within each transaction in the RDD.
-    It groups the transactions and calculates permutations for each transaction separately.
-    The output RDD contains sorted item permutations for each transaction.
+    It takes an RDD of indexed transactions, where each transaction is represented as a list of items and a unique transaction index.
+    For each transaction, it computes permutations of item pairs, ensuring that item pairs are sorted lexicographically by their names.
+    The output RDD contains these sorted item permutations for each transaction.
     """
     try:
         def generate_pairs(transaction):
-            item_list = list(transaction)
+            item_list, transaction_index = transaction
             item_pairs = []
             # Iterate through items in the transaction
             for i in range(len(item_list)):
                 for j in range(i + 1, len(item_list)):
-                    item1 = item_list[i][0]
-                    item2 = item_list[j][0]
-                    transaction_index = item_list[i][1]
+                    item1 = item_list[i]
+                    item2 = item_list[j]
                     # Create pairs for item1 and item2, as well as their reverse order
                     item_pairs.append(((item1, item2), transaction_index))
                     item_pairs.append(((item2, item1), transaction_index))
             return item_pairs
 
-        grouped_items = term_frequency_rdd.groupBy(lambda x: x[1])
-        # Generate permutations within each group
-        item_permutations = grouped_items.flatMap(
-            lambda x: generate_pairs(list(x[1])))
-        sorted_item_permutations = item_permutations.sortBy(lambda x: x[0])
-        return sorted_item_permutations
+        permutations_rdd = indexed_rdd.flatMap(generate_pairs)
+        sorted_permutations_rdd = permutations_rdd.sortBy(
+            lambda x: (x[1], x[0]))
+        return sorted_permutations_rdd
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
@@ -899,13 +861,13 @@ def main():
         occurrence = combination_2item.count()
         logger.info(f"There are {occurrence} number of records.\n")
 
-        associated_transaction = association(combination_2item, logger)
-        show_rdd(associated_transaction, logger)
-        occurrence = associated_transaction.count()
+        associated_transaction_combi = association(combination_2item, logger)
+        show_rdd(associated_transaction_combi, logger)
+        occurrence = associated_transaction_combi.count()
         logger.info(f"There are {occurrence} number of records.\n")
 
         sorted_associated_count = item_pair_counts(
-            associated_transaction, logger)
+            associated_transaction_combi, logger)
         show_rdd(sorted_associated_count, logger)
         occurrence = sorted_associated_count.count()
         logger.info(f"There are {occurrence} number of records.\n")
@@ -923,23 +885,23 @@ def main():
             item_pair_support, 20, logger)
         logger.info(bottom_20_item_pairs)
 
-        term_frequency_list = term_frequency(cleansed_grocery_rdd, logger)
-        show_rdd(term_frequency_list, logger)
-        occurrence = term_frequency_list.count()
+        indexed_grocery_rdd = add_index(cleansed_grocery_rdd, logger)
+        show_rdd(indexed_grocery_rdd, logger)
+        occurrence = indexed_grocery_rdd.count()
         logger.info(f"There are {occurrence} number of records.\n")
 
-        permutation_2item = generate_permutations(term_frequency_list, logger)
+        permutation_2item = generate_permutations(indexed_grocery_rdd, logger)
         show_rdd(permutation_2item, logger)
         occurrence = permutation_2item.count()
         logger.info(f"There are {occurrence} number of records.\n")
 
-        associated_transaction = association(permutation_2item, logger)
-        show_rdd(associated_transaction, logger)
-        occurrence = associated_transaction.count()
+        associated_transaction_permu = association(permutation_2item, logger)
+        show_rdd(associated_transaction_permu, logger)
+        occurrence = associated_transaction_permu.count()
         logger.info(f"There are {occurrence} number of records.\n")
 
         frequency_xy = item_pair_counts(
-            associated_transaction, logger)
+            associated_transaction_permu, logger)
         show_rdd(frequency_xy, logger)
         occurrence = frequency_xy.count()
         logger.info(f"There are {occurrence} number of records.\n")
