@@ -442,16 +442,14 @@ def sql_bottom_n_cat_by(df, grouped_columns, n, spark, logger):
         raise e
 
 
-def analyze_average_delay(df, column, delay_column, logger):
+def analyze_average_positive_delay(df, delay_column, logger):
     """
-    Analyze average departure/arrival delay.
+    Analyze average departure/arrival delay for positive values.
 
     Parameters
     ----------
     df : DataFrame
         The DataFrame containing the data.
-    column : str
-        The column by which to group the data for analysis.
     delay_column : str
         The column representing departure/arrival delay.
     logger : object
@@ -460,7 +458,7 @@ def analyze_average_delay(df, column, delay_column, logger):
     Returns
     -------
     DataFrame
-        DataFrame containing the average departure/arrival delay.
+        DataFrame containing the average departure/arrival delay for positive values.
 
     Raises
     ------
@@ -469,16 +467,58 @@ def analyze_average_delay(df, column, delay_column, logger):
 
     Notes
     -----
-    This function calculates the average departure/arrival delay for a specified column,
-    groups the data by another column,and ranks the results in descending order based on the average delay.
+    This function calculates the average departure/arrival delay for positive values in the specified column.
+    It ranks the results in descending order based on the average delay.
     """
     try:
         suffix = delay_column.split('_')[0]
-        new_column_name = f"average_{suffix}_delay"
+        new_column_name = f"average_positive_{suffix}_delay"
 
-        avg_departure_delay_by_column = df.groupBy(column).agg(avg(col(delay_column)).alias(
-            new_column_name)).orderBy(new_column_name, ascending=False)
-        return avg_departure_delay_by_column
+        # Filter for positive delay values before computing the average.
+        avg_positive_delay = df.agg(avg(when(col(delay_column) >= 0, col(
+            delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
+        return avg_positive_delay
+    except Exception as e:
+        logger.error(f"An error occurred during data analysis: {str(e)}")
+        raise e
+
+
+def analyze_average_negative_delay(df, delay_column, logger):
+    """
+    Analyze average departure/arrival delay for negative values.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The DataFrame containing the data.
+    delay_column : str
+        The column representing departure/arrival delay.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        DataFrame containing the average departure/arrival delay for negative values.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the computation.
+
+    Notes
+    -----
+    This function calculates the average departure/arrival delay for negative values in the specified column.
+    It ranks the results in descending order based on the average delay.
+    """
+    try:
+        suffix = delay_column.split('_')[0]
+        new_column_name = f"average_negative_{suffix}_delay"
+
+        # Filter for negative delay values before computing the average.
+        avg_negative_delay = df.agg(avg(when(col(delay_column) < 0, col(
+            delay_column))).alias(new_column_name)).orderBy(new_column_name, ascending=False)
+        return avg_negative_delay
     except Exception as e:
         logger.error(f"An error occurred during data analysis: {str(e)}")
         raise e
@@ -912,9 +952,9 @@ def main():
             clean_flights_data_df, "carrier", "dep_delay", logger)
         show_dataframe(avg_pos_dep_delay_by_carrier)
 
-        avg_dep_delay_by_carrier = analyze_average_delay(
-            clean_flights_data_df, "carrier", "dep_delay", logger)
-        show_dataframe(avg_dep_delay_by_carrier)
+        avg_pos_dep_delay = analyze_average_positive_delay(
+            clean_flights_data_df, "dep_delay", logger)
+        show_dataframe(avg_pos_dep_delay)
 
         avg_pos_delay_by_month = analyze_positive_delay(
             clean_flights_data_df, "month", "dep_delay", logger)
@@ -927,6 +967,10 @@ def main():
         avg_neg_dep_delay_by_carrier = analyze_negative_delay(
             clean_flights_data_df, "carrier", "dep_delay", logger)
         show_dataframe(avg_neg_dep_delay_by_carrier)
+
+        avg_neg_dep_delay = analyze_average_negative_delay(
+            clean_flights_data_df, "dep_delay", logger)
+        show_dataframe(avg_neg_dep_delay)
 
         avg_neg_dep_delay_by_month = analyze_negative_delay(
             clean_flights_data_df, "month", "dep_delay", logger)
