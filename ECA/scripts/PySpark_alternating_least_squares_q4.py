@@ -200,6 +200,8 @@ def main():
         top_10_movie_rdd = top_10_movie_id_rdd.join(mov_item_rdd)
         top_10_movie_rdd = top_10_movie_rdd.map(
             lambda item: (item[0], item[1][1], item[1][0]))
+        top_10_movie_rdd = top_10_movie_rdd.sortBy(
+            lambda item: item[2], ascending=False)
         show_rdd(top_10_movie_rdd, logger)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
