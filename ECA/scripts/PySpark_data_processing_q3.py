@@ -190,6 +190,50 @@ def process_missing_data(df, logger):
         raise e
 
 
+def custom_split(df, column_to_split, seperator, value_position, new_column_name, logger):
+    """
+    Split a DataFrame column based on a separator and create a new column with the selected value position.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The input DataFrame containing the data.
+    column_to_split : str
+        The name of the column to split.
+    separator : str
+        The separator used to split the column values.
+    value_position : int
+        The position of the value to select after splitting (1-based index).
+    new_column_name : str
+        The name of the new column to store the selected values.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    DataFrame
+        A new DataFrame with the added column containing the selected values.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the split and column creation.
+
+    Notes
+    -----
+    This function takes an input DataFrame and splits a specified column using a given separator.
+    It then creates a new column containing the selected value at the specified position after splitting.
+    The resulting DataFrame includes the new column and the original data.
+    """
+    try:
+        clean_data_df = df.withColumn(new_column_name, split(
+            col(column_to_split), seperator)[value_position-1])
+        return (clean_data_df)
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
 def numeric_stats(df, group_by_column, numeric_column, logger):
     """
     Compute statistics for a numeric column grouped by another column.
@@ -420,8 +464,8 @@ def main():
             ("int", "double", "float", "decimal"))]
         clean_vehicle_mpg_df_01.select(numeric_columns).summary().show()
 
-        clean_vehicle_mpg_df_02 = clean_vehicle_mpg_df_01.withColumn(
-            "manufacturer", split(col("carname"), " ")[0])
+        clean_vehicle_mpg_df_02 = custom_split(
+            clean_vehicle_mpg_df_01, "carname", " ", 1, "manufacturer", logger)
         show_dataframe(clean_vehicle_mpg_df_02)
 
         clean_vehicle_mpg_df_03 = clean_vehicle_mpg_df_02.withColumn(
