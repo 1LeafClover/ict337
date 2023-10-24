@@ -7,6 +7,7 @@ SCRIPTS_DIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.path.join(SCRIPTS_DIR, "..", "data")
 MOVIE_RATINGS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_rating.dat")
 MOVIE_ITEMS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_item.dat")
+MOVIE_GENRE_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_genre.dat")
 LOGGING_LEVEL = logging.INFO
 LOAD_DATA_ERROR_MESSAGE = "An error occurred while loading data: {}"
 FILE_NOT_FOUND_MESSAGE = "The specified file does not exist: {}"
@@ -149,6 +150,9 @@ def top_n_reviewers(rdd, column_index, n, logger):
         raise e
 
 
+# def top_n_movies_per_genre():
+
+
 def main():
     """Entry point of the script.
 
@@ -203,6 +207,39 @@ def main():
         top_10_movie_rdd = top_10_movie_rdd.sortBy(
             lambda item: item[2], ascending=False)
         show_rdd(top_10_movie_rdd, logger)
+
+        movie_release_years = mov_item_rdd.map(lambda line: line[2][-4:])
+        release_year_counts = movie_release_years.countByValue()
+        sorted_release_year_counts = dict(
+            sorted(release_year_counts.items(), key=lambda x: x[1], reverse=True))
+        logger.info(sorted_release_year_counts)
+
+        movie_release_years = movie_release_years.filter(
+            lambda year: year != '')
+        min_year = movie_release_years.min()
+        max_year = movie_release_years.max()
+        print(f"Range of Movie Release Years: {min_year} to {max_year}")
+
+        # Filter movies released in the year with the highest counts
+        top_year = list(sorted_release_year_counts)[0]
+        movies_in_max_year = mov_item_rdd.filter(
+            lambda line: line[2][-4:] == top_year)
+        # Split the movies by genre
+        movies_with_genre = movies_in_max_year.map(lambda line: (
+            line[0], line[1], line[5:]))
+        show_rdd(movies_with_genre, logger)
+        # Compute the average rating for each movie
+        # FIXME: list of genre not showing
+        movie_avg_ratings = mov_review_rdd.groupBy(lambda x: x[1]).map(
+            lambda x: (x[0], sum(float(r[2]) for r in x[1]) / len(x[1])))
+        show_rdd(movie_avg_ratings, logger)
+
+        movies_with_avg_ratings = movies_with_genre.join(movie_avg_ratings)
+        show_rdd(movies_with_avg_ratings, logger)
+
+        mov_genre_rdd = load_data(
+            sc, logger, MOVIE_GENRE_DATA_FILE_PATH, "|")
+        show_rdd(mov_genre_rdd, logger)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
