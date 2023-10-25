@@ -220,26 +220,52 @@ def main():
         max_year = movie_release_years.max()
         print(f"Range of Movie Release Years: {min_year} to {max_year}")
 
-        # Filter movies released in the year with the highest counts
         top_year = list(sorted_release_year_counts)[0]
         movies_in_max_year = mov_item_rdd.filter(
             lambda line: line[2][-4:] == top_year)
+
         # Split the movies by genre
         movies_with_genre = movies_in_max_year.map(lambda line: (
-            line[0], line[1], line[5:]))
-        show_rdd(movies_with_genre, logger)
-        # Compute the average rating for each movie
-        # FIXME: list of genre not showing
-        movie_avg_ratings = mov_review_rdd.groupBy(lambda x: x[1]).map(
-            lambda x: (x[0], sum(float(r[2]) for r in x[1]) / len(x[1])))
-        show_rdd(movie_avg_ratings, logger)
-
-        movies_with_avg_ratings = movies_with_genre.join(movie_avg_ratings)
-        show_rdd(movies_with_avg_ratings, logger)
+            line[0], (line[1], line[5:])))
 
         mov_genre_rdd = load_data(
             sc, logger, MOVIE_GENRE_DATA_FILE_PATH, "|")
-        show_rdd(mov_genre_rdd, logger)
+        genre_mapping = mov_genre_rdd.map(
+            lambda genre: (genre[1], genre[0])).collectAsMap()
+
+        movies_with_genre = movies_with_genre.map(lambda record: ([genre_mapping[str(
+            index)] for index, value in enumerate(record[1][1]) if value == '1'], record[0], record[1][0]))
+
+        movies_with_genre = movies_with_genre.map(
+            lambda x: (x[1], (x[0], x[2])))
+        show_rdd(movies_with_genre, logger)
+        mov_ratings = mov_review_rdd.map(lambda x: (x[1], (x[2])))
+        show_rdd(mov_ratings, logger)
+        movie_genre_with_rating = mov_ratings.join(movies_with_genre)
+
+        movie_genre_with_avg_rating = movie_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[0], x[1][1][1])).map(
+            lambda x: (x[0], len(x[1]), sum(int(item[1][0]) for item in x[1]) / len(x[1])))
+        show_rdd(movie_genre_with_avg_rating, logger)
+        print(movie_genre_with_avg_rating.count())
+
+        sorted_movie_genre_with_avg_rating = movie_genre_with_avg_rating.sortBy(
+            lambda x: (x[0][0], -x[2]), ascending=[True, False])
+        show_rdd(sorted_movie_genre_with_avg_rating, logger)
+
+        keyed_sorted_movie_genre_with_avg_rating = sorted_movie_genre_with_avg_rating.map(
+            lambda x: ((x[0][0], x[0][2]), x[2]))
+        show_rdd(keyed_sorted_movie_genre_with_avg_rating, logger)
+
+        grouped_data = keyed_sorted_movie_genre_with_avg_rating.groupByKey()
+
+        def get_top_3_movies(group):
+            return sorted(group, key=lambda x: x, reverse=True)[:3]
+
+        result = grouped_data.flatMapValues(get_top_3_movies).map(
+            lambda x: (x[0][0], x[0][1], x[1]))
+
+        show_rdd(result, logger)
+
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
