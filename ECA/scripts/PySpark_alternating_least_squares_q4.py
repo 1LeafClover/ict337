@@ -299,11 +299,10 @@ def main():
 
         mov_names_review_with_user = mov_review_with_user.join(mov_name).map(
             lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1]))
-        show_rdd(mov_names_review_with_user, logger)
 
         mov_names_review_with_user = mov_names_review_with_user.map(lambda x: (
             1, assign_age_group(x[3], logger), x[3], x[0], x[1], x[2]))
-
+        show_rdd(mov_names_review_with_user, logger)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
