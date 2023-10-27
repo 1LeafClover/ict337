@@ -8,6 +8,7 @@ DATA_DIR = os.path.join(SCRIPTS_DIR, "..", "data")
 MOVIE_RATINGS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_rating.dat")
 MOVIE_ITEMS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_item.dat")
 MOVIE_GENRE_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_genre.dat")
+TOP3_MOVIE_BY_GENRE_OUTPUT_PATH = os.path.join(DATA_DIR, "top3_mov_by_genre")
 LOGGING_LEVEL = logging.INFO
 LOAD_DATA_ERROR_MESSAGE = "An error occurred while loading data: {}"
 FILE_NOT_FOUND_MESSAGE = "The specified file does not exist: {}"
@@ -32,14 +33,14 @@ def configure_logging():
     return logging.getLogger(__name__)
 
 
-def create_spark_context(app_name="TMA_Market_Basket_Analysis"):
+def create_spark_context(app_name="ECA_Alternating_Least_Squares"):
     """
     Create and return a SparkContext.
 
     Parameters
     ----------
     app_name : str, optional
-        The name of the Spark application. Default is "TMA_Market_Basket_Analysis".
+        The name of the Spark application. Default is "ECA_Alternating_Least_Squares".
 
     Returns
     -------
@@ -238,33 +239,27 @@ def main():
 
         movies_with_genre = movies_with_genre.map(
             lambda x: (x[1], (x[0], x[2])))
-        show_rdd(movies_with_genre, logger)
         mov_ratings = mov_review_rdd.map(lambda x: (x[1], (x[2])))
-        show_rdd(mov_ratings, logger)
         movie_genre_with_rating = mov_ratings.join(movies_with_genre)
 
         movie_genre_with_avg_rating = movie_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[0], x[1][1][1])).map(
             lambda x: (x[0], len(x[1]), sum(int(item[1][0]) for item in x[1]) / len(x[1])))
-        show_rdd(movie_genre_with_avg_rating, logger)
-        print(movie_genre_with_avg_rating.count())
 
         sorted_movie_genre_with_avg_rating = movie_genre_with_avg_rating.sortBy(
-            lambda x: (x[0][0], -x[2]), ascending=[True, False])
+            lambda x: (x[0][0], -x[1]), ascending=[True, False]).map(lambda x: (x[0], x[2]))
         show_rdd(sorted_movie_genre_with_avg_rating, logger)
 
-        keyed_sorted_movie_genre_with_avg_rating = sorted_movie_genre_with_avg_rating.map(
-            lambda x: ((x[0][0], x[0][2]), x[2]))
-        show_rdd(keyed_sorted_movie_genre_with_avg_rating, logger)
+        grouped_movie_genre_with_avg_rating = sorted_movie_genre_with_avg_rating.groupBy(
+            lambda x: x[0][0])
 
-        grouped_data = keyed_sorted_movie_genre_with_avg_rating.groupByKey()
+        # Get the top three values for each group
+        top3_movie_by_genre = grouped_movie_genre_with_avg_rating.flatMap(
+            lambda key_values: (list(key_values[1])[:3],))
+        show_rdd(top3_movie_by_genre, logger)
 
-        def get_top_3_movies(group):
-            return sorted(group, key=lambda x: x, reverse=True)[:3]
-
-        result = grouped_data.flatMapValues(get_top_3_movies).map(
-            lambda x: (x[0][0], x[0][1], x[1]))
-
-        show_rdd(result, logger)
+        # FIXME: winutils not compatible
+        # top3_movie_by_genre.saveAsTextFile(TOP3_MOVIE_BY_GENRE_OUTPUT_PATH)
+        # ''.join(sorted(input(glob(TOP3_MOVIE_BY_GENRE_OUTPUT_PATH + "/part-0000*"))))
 
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
