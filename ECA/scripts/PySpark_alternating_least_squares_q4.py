@@ -8,6 +8,7 @@ DATA_DIR = os.path.join(SCRIPTS_DIR, "..", "data")
 MOVIE_RATINGS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_rating.dat")
 MOVIE_ITEMS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_item.dat")
 MOVIE_GENRE_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_genre.dat")
+MOVIE_USER_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_user.dat")
 TOP3_MOVIE_BY_GENRE_OUTPUT_PATH = os.path.join(DATA_DIR, "top3_mov_by_genre")
 LOGGING_LEVEL = logging.INFO
 LOAD_DATA_ERROR_MESSAGE = "An error occurred while loading data: {}"
@@ -151,6 +152,30 @@ def top_n_reviewers(rdd, column_index, n, logger):
         raise e
 
 
+# TODO: add part b) functions
+
+
+def assign_age_group(age, logger):
+    try:
+        age_groups = {
+            (0, 6): "[0-6]",
+            (7, 12): "(6-12]",
+            (13, 18): "(12-18]",
+            (19, 30): "(18-30]",
+            (31, 50): "(30-50]",
+            (51, float("inf")): "50+"
+        }
+
+        age = int(age)
+        for age_range, group in age_groups.items():
+            if age_range[0] <= age <= age_range[1]:
+                return group
+        return 'Unknown'
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
+
+
 # def top_n_movies_per_genre():
 
 
@@ -235,7 +260,7 @@ def main():
             lambda genre: (genre[1], genre[0])).collectAsMap()
 
         movies_with_genre = movies_with_genre.map(lambda record: ([genre_mapping[str(
-            index)] for index, value in enumerate(record[1][1]) if value == '1'], record[0], record[1][0]))
+            index)] for index, value in enumerate(record[1][1]) if value == "1"], record[0], record[1][0]))
 
         movies_with_genre = movies_with_genre.map(
             lambda x: (x[1], (x[0], x[2])))
@@ -260,6 +285,24 @@ def main():
         # FIXME: winutils not compatible
         # top3_movie_by_genre.saveAsTextFile(TOP3_MOVIE_BY_GENRE_OUTPUT_PATH)
         # ''.join(sorted(input(glob(TOP3_MOVIE_BY_GENRE_OUTPUT_PATH + "/part-0000*"))))
+
+        mov_user_rdd = load_data(
+            sc, logger, MOVIE_USER_DATA_FILE_PATH, "|")
+        mov_user_rdd = mov_user_rdd.map(lambda x: (x[0], (x[1])))
+
+        mov_ratings = mov_review_rdd.map(lambda x: (x[0], (x[1], x[2])))
+
+        mov_review_with_user = mov_ratings.join(mov_user_rdd).map(
+            lambda x: (x[1][0][0], (x[1][0][1], x[1][1])))
+
+        mov_name = mov_item_rdd.map(lambda x: (x[0], (x[1])))
+
+        mov_names_review_with_user = mov_review_with_user.join(mov_name).map(
+            lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1]))
+        show_rdd(mov_names_review_with_user, logger)
+
+        mov_names_review_with_user = mov_names_review_with_user.map(lambda x: (
+            1, assign_age_group(x[3], logger), x[3], x[0], x[1], x[2]))
 
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
