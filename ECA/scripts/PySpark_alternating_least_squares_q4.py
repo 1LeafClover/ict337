@@ -277,7 +277,7 @@ def main():
         grouped_movie_genre_with_avg_rating = sorted_movie_genre_with_avg_rating.groupBy(
             lambda x: x[0][0])
 
-        # Get the top three values for each group
+        # Get the top three values for each groups
         top3_movie_by_genre = grouped_movie_genre_with_avg_rating.flatMap(
             lambda key_values: (list(key_values[1])[:3],))
         show_rdd(top3_movie_by_genre, logger)
@@ -301,8 +301,41 @@ def main():
             lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1]))
 
         mov_names_review_with_user = mov_names_review_with_user.map(lambda x: (
-            1, assign_age_group(x[3], logger), x[3], x[0], x[1], x[2]))
-        show_rdd(mov_names_review_with_user, logger)
+            (assign_age_group(x[3], logger), x[0], x[1]), (x[3], float(x[2]))))
+
+        movie_names_with_avg_rating = mov_names_review_with_user.groupBy(lambda x: (x[0])).map(
+            lambda x: (len(x[1]), list(x[1])[0][0], [list(x[1])[0][1][0] for item in x[1]], sum(int(item[1][1]) for item in x[1]) / len(x[1])))
+
+        movie_names_with_avg_rating = movie_names_with_avg_rating.map(
+            lambda x: (x[1][0], (x[0], x[1][1], x[1][2], x[2], x[3])))
+
+        # Calculate the total count of movies per age group
+        total_movie_count_by_age_group = movie_names_with_avg_rating.map(
+            lambda x: (x[0], 1)).reduceByKey(lambda a, b: a + b)
+
+        # Join the original RDD with the calculated total counts
+        total_movie_count_with_avg_rating = movie_names_with_avg_rating.join(total_movie_count_by_age_group).map(
+            lambda x: (x[1][1], x[0], x[1][0][1], x[1][0][2], x[1][0][3], x[1][0][4], x[1][0][0]))
+        show_rdd(total_movie_count_with_avg_rating, logger)
+
+        sorted_total_movie_count_with_avg_rating = total_movie_count_with_avg_rating.sortBy(lambda x: (
+            -int(x[6]), -float(x[5])), ascending=[False, False])
+        show_rdd(sorted_total_movie_count_with_avg_rating, logger)
+
+        grouped_total_movie_count_with_avg_rating = sorted_total_movie_count_with_avg_rating.groupBy(
+            lambda x: x[1])
+
+        # Take the top 30 values for each age group based on the number of reviews.
+        top30_movie_by_age_group = grouped_total_movie_count_with_avg_rating.flatMap(
+            lambda x: list(x[1])[:30])
+        show_rdd(top30_movie_by_age_group, logger)
+
+        top30_movie_by_age_group = top30_movie_by_age_group.map(
+            lambda x: (x[0], x[1], x[4], x[2], x[3], x[5]))
+        show_rdd(top30_movie_by_age_group, logger)
+
+        print(top30_movie_by_age_group.filter(
+            lambda x: x[1] == "50+").collect())
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
