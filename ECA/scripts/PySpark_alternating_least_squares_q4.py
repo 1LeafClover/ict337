@@ -10,6 +10,10 @@ MOVIE_ITEMS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_item.dat")
 MOVIE_GENRE_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_genre.dat")
 MOVIE_USER_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_user.dat")
 TOP3_MOVIE_BY_GENRE_OUTPUT_PATH = os.path.join(DATA_DIR, "top3_mov_by_genre")
+TOP30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH = os.path.join(
+    DATA_DIR, "top30_mov_by_age_group")
+TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH = os.path.join(
+    DATA_DIR, "top3_summer_mov_by_age_group")
 LOGGING_LEVEL = logging.INFO
 LOAD_DATA_ERROR_MESSAGE = "An error occurred while loading data: {}"
 FILE_NOT_FOUND_MESSAGE = "The specified file does not exist: {}"
@@ -316,11 +320,9 @@ def main():
         # Join the original RDD with the calculated total counts
         total_movie_count_with_avg_rating = movie_names_with_avg_rating.join(total_movie_count_by_age_group).map(
             lambda x: (x[1][1], x[0], x[1][0][1], x[1][0][2], x[1][0][3], x[1][0][4], x[1][0][0]))
-        show_rdd(total_movie_count_with_avg_rating, logger)
 
         sorted_total_movie_count_with_avg_rating = total_movie_count_with_avg_rating.sortBy(lambda x: (
             -int(x[6]), -float(x[5])), ascending=[False, False])
-        show_rdd(sorted_total_movie_count_with_avg_rating, logger)
 
         grouped_total_movie_count_with_avg_rating = sorted_total_movie_count_with_avg_rating.groupBy(
             lambda x: x[1])
@@ -328,14 +330,55 @@ def main():
         # Take the top 30 values for each age group based on the number of reviews.
         top30_movie_by_age_group = grouped_total_movie_count_with_avg_rating.flatMap(
             lambda x: list(x[1])[:30])
-        show_rdd(top30_movie_by_age_group, logger)
 
         top30_movie_by_age_group = top30_movie_by_age_group.map(
             lambda x: (x[0], x[1], x[4], x[2], x[3], x[5]))
         show_rdd(top30_movie_by_age_group, logger)
 
-        print(top30_movie_by_age_group.filter(
-            lambda x: x[1] == "50+").collect())
+        # FIXME: winutils not compatible
+        # top30_movie_by_age_group.saveAsTextFile(TOP30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH)
+        # ''.join(sorted(input(glob(TOP30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH + "/part-0000*"))))
+
+        summer = ["may", "jun", "jul"]
+        movies_in_summer = mov_item_rdd.filter(
+            lambda line: line[2][3:-5].lower() in summer)
+
+        # Split the movies by genre
+        summer_movies_with_genre = movies_in_summer.map(lambda line: (
+            line[0], (line[1], line[5:])))
+
+        mov_genre_rdd = load_data(
+            sc, logger, MOVIE_GENRE_DATA_FILE_PATH, "|")
+        genre_mapping = mov_genre_rdd.map(
+            lambda genre: (genre[1], genre[0])).collectAsMap()
+
+        summer_movies_with_genre = summer_movies_with_genre.map(lambda record: ([genre_mapping[str(
+            index)] for index, value in enumerate(record[1][1]) if value == "1"], record[0], record[1][0]))
+
+        summer_movies_with_genre = summer_movies_with_genre.map(
+            lambda x: (x[1], (x[0], x[2])))
+        mov_ratings = mov_review_rdd.map(lambda x: (x[1], (x[2])))
+        summer_movie_genre_with_rating = mov_ratings.join(
+            summer_movies_with_genre)
+
+        summer_movie_genre_with_avg_rating = summer_movie_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[0], x[1][1][1])).map(
+            lambda x: (x[0], len(x[1]), sum(int(item[1][0]) for item in x[1]) / len(x[1])))
+
+        sorted_summer_movie_genre_with_avg_rating = summer_movie_genre_with_avg_rating.sortBy(
+            lambda x: (x[0][0], -x[1]), ascending=[True, False]).map(lambda x: (x[0], x[2]))
+
+        grouped_summer_movie_genre_with_avg_rating = sorted_summer_movie_genre_with_avg_rating.groupBy(
+            lambda x: x[0][0])
+
+        # Get the top three values for each groups
+        top3_summer_movie_by_genre = grouped_summer_movie_genre_with_avg_rating.flatMap(
+            lambda key_values: (list(key_values[1])[:3],))
+        show_rdd(top3_summer_movie_by_genre, logger)
+
+        # FIXME: winutils not compatible
+        # top3_summer_movie_by_genre.saveAsTextFile(TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH)
+        # ''.join(sorted(input(glob(TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH + "/part-0000*"))))
+
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
         raise e
