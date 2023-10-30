@@ -276,7 +276,6 @@ def main():
 
         sorted_movie_genre_with_avg_rating = movie_genre_with_avg_rating.sortBy(
             lambda x: (x[0][0], -x[1]), ascending=[True, False]).map(lambda x: (x[0], x[2]))
-        show_rdd(sorted_movie_genre_with_avg_rating, logger)
 
         grouped_movie_genre_with_avg_rating = sorted_movie_genre_with_avg_rating.groupBy(
             lambda x: x[0][0])
@@ -347,11 +346,6 @@ def main():
         summer_movies_with_genre = movies_in_summer.map(lambda line: (
             line[0], (line[1], line[5:])))
 
-        mov_genre_rdd = load_data(
-            sc, logger, MOVIE_GENRE_DATA_FILE_PATH, "|")
-        genre_mapping = mov_genre_rdd.map(
-            lambda genre: (genre[1], genre[0])).collectAsMap()
-
         summer_movies_with_genre = summer_movies_with_genre.map(lambda record: ([genre_mapping[str(
             index)] for index, value in enumerate(record[1][1]) if value == "1"], record[0], record[1][0]))
 
@@ -379,7 +373,48 @@ def main():
         # top3_summer_movie_by_genre.saveAsTextFile(TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH)
         # ''.join(sorted(input(glob(TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH + "/part-0000*"))))
 
-    except Exception as e:
+        mov_ratings = mov_review_rdd.map(lambda x: (x[0], (x[1], x[2])))
+
+        mov_user_rdd = load_data(
+            sc, logger, MOVIE_USER_DATA_FILE_PATH, "|")
+
+        mov_user_rdd = mov_user_rdd.map(lambda x: (x[0], x[3]))
+
+        mov_review_with_user = mov_ratings.join(mov_user_rdd).map(
+            lambda x: (x[1][0][0], (x[1][0][1], x[1][1])))
+
+        mov_item_rdd = mov_item_rdd.map(lambda line: (
+            line[0], (line[1], line[5:])))
+
+        movies_with_genre = mov_item_rdd.map(lambda record: ([genre_mapping[str(
+            index)] for index, value in enumerate(record[1][1]) if value == "1"], record[0], record[1][0]))
+
+        movies_with_genre = movies_with_genre.map(
+            lambda x: (x[1], (x[0], x[2])))
+
+        movie_genre_with_rating = mov_review_with_user.join(movies_with_genre)
+
+        movie_genre_with_avg_rating = movie_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[1][0][1], x[0], x[1][1][1])).map(
+            lambda x: (x[0], len(x[1]), sum(int(item[1][0][0]) for item in x[1]) / len(x[1])))
+        show_rdd(movie_genre_with_avg_rating, logger)
+
+        sorted_movie_genre_with_avg_rating = movie_genre_with_avg_rating.sortBy(
+            lambda x: (x[0][0], -x[1]), ascending=[True, False]).map(lambda x: (x[0][1], x[0][0], x[0][2], x[0][3], x[2]))
+
+        grouped_movie_genre_with_avg_rating = sorted_movie_genre_with_avg_rating.groupBy(
+            lambda x: x[1])
+
+        # Get the top three values for each groups
+        top3_movie_by_genre = grouped_movie_genre_with_avg_rating.flatMap(
+            lambda key_values: (list(key_values[1])[:3],))
+
+        top3_movie_by_genre = top3_movie_by_genre.flatMap(lambda row: row)
+
+        filtered_data = top3_movie_by_genre.filter(
+            lambda row: row[0].lower() == "administrator" and "action" in row[1][0].lower())
+
+        top3_admin_action_mov = filtered_data.take(3)
+        logger.info(top3_admin_action_mov)
         logger.error(f"An error occurred: {str(e)}")
         raise e
     finally:
