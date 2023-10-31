@@ -1,6 +1,7 @@
 import logging
 import os
 from pyspark import SparkContext
+from pyspark.mllib.recommendation import ALS
 
 # Constants
 SCRIPTS_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -159,6 +160,7 @@ def top_n_reviewers(rdd, column_index, n, logger):
 # TODO: add part b) functions
 
 
+# TODO: add part c) functions
 def assign_age_group(age, logger):
     try:
         age_groups = {
@@ -180,7 +182,20 @@ def assign_age_group(age, logger):
         raise e
 
 
-# def top_n_movies_per_genre():
+# TODO: add part d) functions
+
+
+# TODO: add part e) functions
+
+
+def add_new_user_profiles(existing_reviews_rdd, new_user_reviews, sc, logger):
+    try:
+        new_user_reviews_rdd = sc.parallelize(new_user_reviews)
+        updated_reviews = new_user_reviews_rdd.union(existing_reviews_rdd)
+        return updated_reviews
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
 
 
 def main():
@@ -248,7 +263,7 @@ def main():
             lambda year: year != '')
         min_year = movie_release_years.min()
         max_year = movie_release_years.max()
-        print(f"Range of Movie Release Years: {min_year} to {max_year}")
+        logger.info(f"Range of Movie Release Years: {min_year} to {max_year}")
 
         top_year = list(sorted_release_year_counts)[0]
         movies_in_max_year = mov_item_rdd.filter(
@@ -421,6 +436,38 @@ def main():
 
         top3_admin_action_mov = filtered_data.take(3)
         logger.info(top3_admin_action_mov)
+
+        new_user_profiles = [
+            [0, 50, 5, 881250949],
+            [0, 172, 5, 881250949],
+            [0, 181, 5, 881250949]
+        ]
+
+        updated_reviews = add_new_user_profiles(
+            mov_review_rdd, new_user_profiles, sc, logger)
+        show_rdd(updated_reviews, logger)
+        logger.info(updated_reviews.count())
+
+        # Selecting user/reviewer identifier, movie identifier, rating
+        ratings = updated_reviews.filter(lambda row: len(row) == 4).map(
+            lambda x: (int(x[0]), int(x[1]), float(x[2])))
+
+        # Define ALS model parameters
+        rank = 20
+        num_iterations = 15
+
+        mov_ratings_model = ALS.train(ratings, rank, num_iterations)
+        show_rdd(mov_ratings_model.userFeatures(), logger)
+        logger.info(mov_ratings_model.userFeatures().count())
+
+        user_id = 0
+        num_recommendations = 10
+
+        # Use the model to recommend movies for the user
+        mov_recommendations = mov_ratings_model.recommendProducts(
+            user_id, num_recommendations)
+        print(mov_recommendations)
+        logger.info(len(mov_recommendations))
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
     finally:
