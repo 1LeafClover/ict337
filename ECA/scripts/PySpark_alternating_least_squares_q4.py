@@ -283,6 +283,9 @@ def main():
         # Get the top three values for each groups
         top3_movie_by_genre = grouped_movie_genre_with_avg_rating.flatMap(
             lambda key_values: (list(key_values[1])[:3],))
+
+        top3_movie_by_genre = top3_movie_by_genre.flatMap(
+            lambda row: row)
         show_rdd(top3_movie_by_genre, logger)
 
         # FIXME: winutils not compatible
@@ -367,6 +370,9 @@ def main():
         # Get the top three values for each groups
         top3_summer_movie_by_genre = grouped_summer_movie_genre_with_avg_rating.flatMap(
             lambda key_values: (list(key_values[1])[:3],))
+
+        top3_summer_movie_by_genre = top3_summer_movie_by_genre.flatMap(
+            lambda row: row)
         show_rdd(top3_summer_movie_by_genre, logger)
 
         # FIXME: winutils not compatible
@@ -396,7 +402,6 @@ def main():
 
         movie_genre_with_avg_rating = movie_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[1][0][1], x[0], x[1][1][1])).map(
             lambda x: (x[0], len(x[1]), sum(int(item[1][0][0]) for item in x[1]) / len(x[1])))
-        show_rdd(movie_genre_with_avg_rating, logger)
 
         sorted_movie_genre_with_avg_rating = movie_genre_with_avg_rating.sortBy(
             lambda x: (x[0][0], -x[1]), ascending=[True, False]).map(lambda x: (x[0][1], x[0][0], x[0][2], x[0][3], x[2]))
@@ -409,14 +414,15 @@ def main():
             lambda key_values: (list(key_values[1])[:3],))
 
         top3_movie_by_genre = top3_movie_by_genre.flatMap(lambda row: row)
+        show_rdd(top3_movie_by_genre, logger)
 
         filtered_data = top3_movie_by_genre.filter(
             lambda row: row[0].lower() == "administrator" and "action" in row[1][0].lower())
 
         top3_admin_action_mov = filtered_data.take(3)
         logger.info(top3_admin_action_mov)
+    except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
-        raise e
     finally:
         if sc is not None:
             sc.stop()
