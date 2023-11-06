@@ -10,14 +10,27 @@ MOVIE_RATINGS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_rating.dat")
 MOVIE_ITEMS_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_item.dat")
 MOVIE_GENRE_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_genre.dat")
 MOVIE_USER_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_user.dat")
+MOVIE_OCCUPATION_DATA_FILE_PATH = os.path.join(DATA_DIR, "mov_occupation.dat")
 TOP_3_MOVIE_BY_GENRE_OUTPUT_PATH = os.path.join(DATA_DIR, "top_3_mov_by_genre")
-TOP30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH = os.path.join(
-    DATA_DIR, "top30_mov_by_age_group")
-TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH = os.path.join(
-    DATA_DIR, "top3_summer_mov_by_age_group")
+TOP_30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH = os.path.join(
+    DATA_DIR, "top_30_mov_by_age_group")
+TOP_3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH = os.path.join(
+    DATA_DIR, "top_3_summer_mov_by_genre")
 LOGGING_LEVEL = logging.INFO
 LOAD_DATA_ERROR_MESSAGE = "An error occurred while loading data: {}"
 FILE_NOT_FOUND_MESSAGE = "The specified file does not exist: {}"
+
+# Configurations
+age_groups = {(0, 6): "[0-6]", (7, 12): "(6-12]", (13, 18): "(12-18]",
+              (19, 30): "(18-30]", (31, 50): "(30-50]", (51, float("inf")): "50+"}
+
+summer = ["may", "jun", "jul"]
+
+new_user_profiles = [
+    [0, 50, 5, 881250949],
+    [0, 172, 5, 881250949],
+    [0, 181, 5, 881250949]
+]
 
 
 def configure_logging():
@@ -182,16 +195,16 @@ def count_unique_by(loaded_rdd, column_index, logger):
         raise e
 
 
-def top_n_counts_by(loaded_rdd, column_index, n, logger):
+def top_n_counts_by(loaded_rdd, column_position, n, logger):
     """
-    Get the top 'n' counts of values in an RDD based on a specified column index.
+    Get the top 'n' counts of values in an RDD based on a specified column position.
 
     Parameters
     ----------
     loaded_rdd : RDD
         The input RDD containing data.
-    column_index : int
-        The index of the column to consider for counting values.
+    column_position : int
+        The position of the column to consider for counting values.
     n : int
         The number of top counts to retrieve.
     logger : object
@@ -210,7 +223,7 @@ def top_n_counts_by(loaded_rdd, column_index, n, logger):
     Notes
     -----
     This function processes an RDD to retrieve the top 'n' counts and their corresponding values in a specified column.
-    The 'column_index' parameter determines which column to consider, and the values are counted using the `countByValue()` method.
+    The 'column_position' parameter determines which column to consider, and the values are counted using the `countByValue()` method.
 
     The 'logger' object is used for logging messages, and any error that occurs during the retrieval process is logged and raised as an exception.
 
@@ -218,7 +231,7 @@ def top_n_counts_by(loaded_rdd, column_index, n, logger):
     """
     try:
         review_count = loaded_rdd.map(
-            lambda line: line[column_index-1]).countByValue()
+            lambda line: line[column_position-1]).countByValue()
 
         sorted_review_count = sorted(
             review_count.items(), key=lambda item: item[1], reverse=True)
@@ -467,7 +480,7 @@ def write_top_n_reviewed_movies_by_genre(movie_genre_with_avg_rating, genre_rdd,
             sorted_top_n_movie_by_genre = top_n_movie_by_genre.sortBy(
                 lambda x: x[3], ascending=False)
 
-            genre_output_path_for_genre = f"{genre_output_path}\{genre_name}.txt"
+            genre_output_path_for_genre = f"{genre_output_path}\{genre_name}"
 
             sorted_top_n_movie_by_genre.coalesce(
                 1).saveAsTextFile(genre_output_path_for_genre)
@@ -476,18 +489,44 @@ def write_top_n_reviewed_movies_by_genre(movie_genre_with_avg_rating, genre_rdd,
         raise e
 
 
-# TODO: add part c) functions
-def assign_age_group(age, logger):
-    try:
-        age_groups = {
-            (0, 6): "[0-6]",
-            (7, 12): "(6-12]",
-            (13, 18): "(12-18]",
-            (19, 30): "(18-30]",
-            (31, 50): "(30-50]",
-            (51, float("inf")): "50+"
-        }
+def assign_age_group(age, age_groups: dict, logger):
+    """
+    Assign an age group label based on the provided age and age group definitions.
 
+    Parameters
+    ----------
+    age : int
+        The age of the user to be categorized into an age group.
+    age_groups : dict
+        A dictionary containing age group definitions as key-value pairs.
+        The keys are tuples representing age range boundaries, and the values are the corresponding age group labels.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    str
+        The age group label to which the given age belongs. Returns 'Unknown' if the age doesn't fit into any defined age group.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the assignment process, it is logged and raised.
+
+    Notes
+    -----
+    This function categorizes a user's age into an age group based on the provided age group definitions. It follows these steps:
+
+    1. Converts the 'age' parameter to an integer.
+    2. Iterates through the 'age_groups' dictionary to find a matching age range.
+    3. If the age falls within a defined age range, the corresponding age group label is returned.
+    4. If no matching age range is found, 'Unknown' is returned as the age group label.
+
+    The 'logger' object is used for logging messages, and any error that occurs during the process is logged and raised as an exception.
+
+    Note: The default logging level is set to the value of the constant LOGGING_LEVEL.
+    """
+    try:
         age = int(age)
         for age_range, group in age_groups.items():
             if age_range[0] <= age <= age_range[1]:
@@ -498,13 +537,215 @@ def assign_age_group(age, logger):
         raise e
 
 
-# TODO: add part d) functions
+def write_top_n_reviewed_movies_by_age_group(movie_names_review_with_user, age_groups: dict, n, age_group_output_path, logger):
+    """
+    Write the top 'n' reviewed movies for each age group to separate text files.
+
+    Parameters
+    ----------
+    movie_names_review_with_user : RDD
+        An RDD containing movie records with age group information, including movie ID, movie name, age group, age, and rating.
+    age_groups : dict
+        A dictionary containing age group definitions as key-value pairs.
+        The keys are tuples representing age range boundaries, and the values are the corresponding age group labels.
+    n : int
+        The number of top reviewed movies to retrieve for each age group.
+    age_group_output_path : str
+        The base path for saving age group-specific text files.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    Exception
+        If an error occurs during writing, it is logged and raised.
+
+    Notes
+    -----
+    This function processes movie data with age group information to write the top 'n' reviewed movies for each age group to separate text files.
+    It follows these steps:
+
+    1. Transform the input RDD to prepare it for calculations.
+    2. Calculate the total count of movies per age group.
+    3. Insert the total count into the RDD.
+    4. Find the list of age groups per movie ID.
+    5. Insert the list of age groups into the RDD.
+    6. Loop through each age group and filter movies by the age group.
+    7. Calculate the average rating per movie in the age group.
+    8. Sort movies by the number of reviews in descending order.
+    9. Select the top 'n' reviewed movies for the age group.
+    10. Sort the selected movies by their average rating in descending order.
+    11. Save the sorted movies to text files specific to each age group using 'age_group_output_path'.
+
+    The 'logger' object is used for logging messages, and any error that occurs during the process is logged and raised as an exception.
+
+    Note: The default logging level is set to the value of the constant LOGGING_LEVEL.
+    """
+    try:
+        transformed_movie_names_review_with_user = movie_names_review_with_user.map(
+            lambda x: (x[0][0], (x[0][1], x[0][2], x[1][0], x[1][1])))
+
+        # Calculate the total count of movies per age group
+        total_movie_count_by_age_group = transformed_movie_names_review_with_user.map(
+            lambda x: (x[0], 1)).reduceByKey(lambda a, b: a + b)
+
+        # Insert total count
+        total_movie_count_by_age_group = transformed_movie_names_review_with_user.join(
+            total_movie_count_by_age_group).map(lambda x: (
+                x[1][0][0], (x[1][1], x[0], x[1][0][1], x[1][0][2], x[1][0][3])))
+
+        movie_age_group = movie_names_review_with_user.map(
+            lambda x: (x[0][1], x[0][0]))
+
+        # Find list of age groups per movie id
+        age_group_list = movie_age_group.distinct().groupByKey().map(
+            lambda x: (x[0], (list(x[1]))))
+
+        # Insert list of age groups
+        total_movie_count_by_age_group = total_movie_count_by_age_group.join(age_group_list).map(
+            lambda x: ((x[1][0][1], x[0], x[1][0][2]), (x[1][0][0], x[1][1], x[1][0][3], x[1][0][4])))
+
+        # Loop through each genre
+        for age_range, age_group in age_groups.items():
+            # Filter movies by the age_group
+            filtered_movies_in_age_group = total_movie_count_by_age_group.filter(
+                lambda x: x[0][0] == age_group)
+
+            # Calculate average rating per movie
+            filtered_movie_names_with_avg_rating = filtered_movies_in_age_group.groupByKey().map(lambda x: (len(x[1]), list(
+                x[1])[0][0], list(x[1])[0][1], x[0][1], x[0][2], sum(float(item[3]) for item in x[1]) / len(x[1])))
+
+            # Sort movies by number of reviews in descending order
+            most_reviewed_movies = filtered_movie_names_with_avg_rating.sortBy(
+                lambda x: (x[0]), ascending=False).map(lambda x: (x[1], x[2], x[3], x[4], x[5]))
+
+            top_n_movie_by_age_group = most_reviewed_movies.zipWithIndex().filter(
+                lambda x: x[1] < n).keys()
+
+            # Sort movies by average rating in descending order
+            sorted_top_n_movie_by_age_group = top_n_movie_by_age_group.sortBy(
+                lambda x: x[4], ascending=False)
+
+            age_group_output_path_for_age_group = f"{age_group_output_path}\{age_group}"
+
+            sorted_top_n_movie_by_age_group.coalesce(
+                1).saveAsTextFile(age_group_output_path_for_age_group)
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
 
 
-# TODO: add part e) functions
+def write_top_n_reviewed_movies_by_occupation_genre(movie_genre_with_avg_rating, occupation_list, genre_list, n, logger):
+    """
+    Write the top 'n' reviewed movies for each occupation and genre to separate text files.
+
+    Parameters
+    ----------
+    movie_genre_with_avg_rating : RDD
+        An RDD containing movie records with genres and average ratings, where each record is a tuple in the format:
+        ((occupation, genre), movie_id, movie_name, number_of_reviews, average_rating).
+    occupation_list : list
+        A list of occupations for which to calculate the top reviewed movies.
+    genre_list : list
+        A list of genres for which to calculate the top reviewed movies.
+    n : int
+        The number of top reviewed movies to retrieve for each occupation and genre.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    Exception
+        If an error occurs during writing, it is logged and raised.
+
+    Notes
+    -----
+    This function processes movie data with occupation and genre information to write the top 'n' reviewed movies for each combination of occupation and genre to separate text files.
+    It follows these steps:
+
+    1. Loop through each occupation in the 'occupation_list'.
+    2. Loop through each genre in the 'genre_list'.
+    3. Filter movies by the current occupation and genre combination.
+    4. Sort movies by the number of reviews in descending order.
+    5. Select the top 'n' reviewed movies for the current occupation and genre combination.
+    6. Sort the selected movies by their average rating in descending order.
+    7. Construct a header indicating the current occupation and genre combination.
+    8. Log the header and the top reviewed movies for that combination.
+
+    The 'logger' object is used for logging messages, and any error that occurs during the process is logged and raised as an exception.
+
+    Note: The default logging level is set to the value of the constant LOGGING_LEVEL.
+    """
+    try:
+        # Loop through each occupation
+        for occupation in occupation_list:
+            # Loop through each genre
+            for genre_name in genre_list:
+                # Filter movies by the current occupation and genre
+                filtered_movies = movie_genre_with_avg_rating.filter(
+                    lambda x: x[0][0] == occupation and genre_name in x[0][1])
+
+                # Sort movies by number of reviews in descending order
+                filtered_movie_names_with_count = filtered_movies.sortBy(
+                    lambda x: (x[1]), ascending=False).map(lambda x: (x[0][0], x[0][1], x[0][2], x[0][3], x[2]))
+
+                top_n_movie_by_genre = filtered_movie_names_with_count.zipWithIndex().filter(
+                    lambda x: x[1] < n).keys()
+
+                # Sort movies by average rating in descending order
+                sorted_top_n_movie_by_genre = top_n_movie_by_genre.sortBy(
+                    lambda x: (x[4]), ascending=False)
+
+                header = f"Occupation: {occupation}, Genre: {genre_name}"
+                logger.info(
+                    f"{header}\n{sorted_top_n_movie_by_genre.collect()}")
+    except Exception as e:
+        logger.error(f"An error occurred: {str(e)}")
+        raise e
 
 
 def add_new_user_profiles(existing_reviews_rdd, new_user_reviews, sc, logger):
+    """
+    Add new user profiles to existing reviews in an RDD.
+
+    Parameters
+    ----------
+    existing_reviews_rdd : RDD
+        An RDD containing existing user reviews.
+    new_user_reviews : list
+        A list of new user reviews to be added.
+    sc : SparkContext
+        The SparkContext for parallelizing the new user reviews.
+    logger : object
+        Logger object for logging messages.
+
+    Returns
+    -------
+    RDD
+        An RDD containing updated reviews after adding the new user profiles.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the updating, it is logged and raised.
+
+    Notes
+    -----
+    This function takes a list of new user reviews, converts it into an RDD, and adds the new user profiles to the existing reviews.
+    The resulting RDD contains all the reviews, including the new user profiles.
+
+    The 'logger' object is used for logging messages, and any error that occurs during the updating process is logged and raised as an exception.
+
+    Note: The default logging level is set to the value of the constant LOGGING_LEVEL.
+    """
     try:
         new_user_reviews_rdd = sc.parallelize(new_user_reviews)
         updated_reviews = new_user_reviews_rdd.union(existing_reviews_rdd)
@@ -515,7 +756,8 @@ def add_new_user_profiles(existing_reviews_rdd, new_user_reviews, sc, logger):
 
 
 def main():
-    """Entry point of the script.
+    """
+    Entry point of the script for processing movies data.
 
     Parameters
     ----------
@@ -527,14 +769,17 @@ def main():
 
     Notes
     -----
-    This function serves as the entry point of the script for processing flight data. It performs the following steps:
+    This function serves as the entry point of the script for processing movies data. It performs the following steps:
 
     1. Configures the logging settings and initializes a logger.
     2. Creates a SparkContext for data processing.
-    3. Loads grocery data from a CSV file and cleanses it from trailing spaces.
-    4. Displays and logs various statistics and analysis results, such as transaction counts, unique item counts, top and bottom items, support, etc.
-    5. Computes confidence values for item pairs and displays the top and bottom item pairs with confidence.
-    6. Stops the SparkContext when processing is complete.
+    3. Loads movie ratings data from a CSV file and cleanses it from trailing spaces.
+    4. Displays and logs various statistics and analysis results, such as transaction counts, unique reviewer and movie counts, top reviewers, top reviewed movies, and movie release years.
+    5. Analyzes and logs top reviewed movies by genre and occupation.
+    6. Adds new user profiles to the existing reviews.
+    7. Builds and trains an ALS recommendation model using user ratings.
+    8. Generates movie recommendations for a specific user.
+    9. Stops the SparkContext when processing is complete.
     """
     logger = configure_logging()
     sc = create_spark_context()
@@ -586,32 +831,34 @@ def main():
             lambda line: line[2][-4:] == top_year)
 
         # Select movie id, movie name and list of genres
-        mov_with_genre = mov_in_max_year.map(lambda line: (
+        top_year_mov_with_genre = mov_in_max_year.map(lambda line: (
             line[0], (line[1], line[5:])))
 
         mov_genre_rdd = load_data(
             sc, logger, MOVIE_GENRE_DATA_FILE_PATH, "|")
 
-        mov_with_genre = extract_genres(mov_with_genre, mov_genre_rdd, logger)
+        top_year_mov_with_genre = extract_genres(
+            top_year_mov_with_genre, mov_genre_rdd, logger)
 
         mov_ratings = mov_review_rdd.map(lambda x: (x[1], (x[2])))
-        mov_genre_with_rating = mov_ratings.join(mov_with_genre)
 
-        # Compute for average rating based on genre, movie id and movie name
+        mov_genre_with_rating = mov_ratings.join(top_year_mov_with_genre)
+
+        # Compute for average rating and number of reviews based on genre, movie id and movie name
         mov_genre_with_avg_rating = mov_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[0], x[1][1][1])).map(
             lambda x: (x[0], len(x[1]), sum(int(item[1][0]) for item in x[1]) / len(x[1])))
 
-        # TODO: Uncomment before prod
-        # write_top_n_reviewed_movies_by_genre(
-        #     mov_genre_with_avg_rating, mov_genre_rdd, 3, TOP_3_MOVIE_BY_GENRE_OUTPUT_PATH, logger)
+        write_top_n_reviewed_movies_by_genre(
+            mov_genre_with_avg_rating, mov_genre_rdd, 3, TOP_3_MOVIE_BY_GENRE_OUTPUT_PATH, logger)
 
         mov_user_rdd = load_data(
             sc, logger, MOVIE_USER_DATA_FILE_PATH, "|")
-        mov_user_rdd = mov_user_rdd.map(lambda x: (x[0], (x[1])))
+
+        mov_user_age = mov_user_rdd.map(lambda x: (x[0], (x[1])))
 
         mov_ratings = mov_review_rdd.map(lambda x: (x[0], (x[1], x[2])))
 
-        mov_review_with_user = mov_ratings.join(mov_user_rdd).map(
+        mov_review_with_user = mov_ratings.join(mov_user_age).map(
             lambda x: (x[1][0][0], (x[1][0][1], x[1][1])))
 
         mov_name = mov_item_rdd.map(lambda x: (x[0], (x[1])))
@@ -619,153 +866,95 @@ def main():
         mov_names_review_with_user = mov_review_with_user.join(mov_name).map(
             lambda x: (x[0], x[1][1], x[1][0][0], x[1][0][1]))
 
+        # Assign age group and outputs age group, movie id, movie name, age and rating
         mov_names_review_with_user = mov_names_review_with_user.map(lambda x: (
-            (assign_age_group(x[3], logger), x[0], x[1]), (x[3], float(x[2]))))
+            (assign_age_group(x[3], age_groups, logger), x[0], x[1]), (x[3], float(x[2]))))
 
-        movie_names_with_avg_rating = mov_names_review_with_user.groupBy(lambda x: (x[0])).map(
-            lambda x: (len(x[1]), list(x[1])[0][0], [list(x[1])[0][1][0] for item in x[1]], sum(int(item[1][1]) for item in x[1]) / len(x[1])))
+        write_top_n_reviewed_movies_by_age_group(
+            mov_names_review_with_user, age_groups, 30, TOP_30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH, logger)
 
-        movie_names_with_avg_rating = movie_names_with_avg_rating.map(
-            lambda x: (x[1][0], (x[0], x[1][1], x[1][2], x[2], x[3])))
+        movies_in_summer = mov_item_rdd.filter(
+            lambda line: line[2][3:-5].lower() in summer)
 
-        # Calculate the total count of movies per age group
-        total_movie_count_by_age_group = movie_names_with_avg_rating.map(
-            lambda x: (x[0], 1)).reduceByKey(lambda a, b: a + b)
+        # Split the movies by genre
+        summer_movies_with_genre = movies_in_summer.map(lambda line: (
+            line[0], (line[1], line[5:])))
 
-        # Join the original RDD with the calculated total counts
-        total_movie_count_with_avg_rating = movie_names_with_avg_rating.join(total_movie_count_by_age_group).map(
-            lambda x: (x[1][1], x[0], x[1][0][1], x[1][0][2], x[1][0][3], x[1][0][4], x[1][0][0]))
+        summer_movies_with_genre = extract_genres(
+            summer_movies_with_genre, mov_genre_rdd, logger)
 
-        sorted_total_movie_count_with_avg_rating = total_movie_count_with_avg_rating.sortBy(lambda x: (
-            -int(x[6]), -float(x[5])), ascending=[False, False])
+        mov_ratings = mov_review_rdd.map(lambda x: (x[1], (x[2])))
 
-        grouped_total_movie_count_with_avg_rating = sorted_total_movie_count_with_avg_rating.groupBy(
-            lambda x: x[1])
+        summer_mov_genre_with_rating = mov_ratings.join(
+            summer_movies_with_genre)
 
-        # Take the top 30 values for each age group based on the number of reviews.
-        top30_movie_by_age_group = grouped_total_movie_count_with_avg_rating.flatMap(
-            lambda x: list(x[1])[:30])
+        # Compute for average rating and number of reviews based on genre, movie id and movie name
+        summer_mov_genre_with_avg_rating = summer_mov_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[0], x[1][1][1])).map(
+            lambda x: (x[0], len(x[1]), sum(int(item[1][0]) for item in x[1]) / len(x[1])))
 
-        top30_movie_by_age_group = top30_movie_by_age_group.map(
-            lambda x: (x[0], x[1], x[4], x[2], x[3], x[5]))
-        show_rdd(top30_movie_by_age_group, logger)
+        write_top_n_reviewed_movies_by_genre(
+            summer_mov_genre_with_avg_rating, mov_genre_rdd, 3, TOP_3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH, logger)
 
-        # # FIXME: winutils not compatible
-        # # top30_movie_by_age_group.saveAsTextFile(TOP30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH)
-        # # ''.join(sorted(input(glob(TOP30_MOVIE_BY_AGE_GROUP_OUTPUT_PATH + "/part-0000*"))))
+        mov_ratings = mov_review_rdd.map(lambda x: (x[0], (x[1], x[2])))
 
-        # summer = ["may", "jun", "jul"]
-        # movies_in_summer = mov_item_rdd.filter(
-        #     lambda line: line[2][3:-5].lower() in summer)
+        mov_user_occupation = mov_user_rdd.map(lambda x: (x[0], x[3]))
 
-        # # Split the movies by genre
-        # summer_movies_with_genre = movies_in_summer.map(lambda line: (
-        #     line[0], (line[1], line[5:])))
+        mov_review_with_user = mov_ratings.join(mov_user_occupation).map(
+            lambda x: (x[1][0][0], (x[1][1], x[1][0][1])))
 
-        # summer_movies_with_genre = summer_movies_with_genre.map(lambda record: ([genre_mapping[str(
-        #     index)] for index, value in enumerate(record[1][1]) if value == "1"], record[0], record[1][0]))
+        mov_with_genre = mov_item_rdd.map(lambda line: (
+            line[0], (line[1], line[5:])))
 
-        # summer_movies_with_genre = summer_movies_with_genre.map(
-        #     lambda x: (x[1], (x[0], x[2])))
-        # mov_ratings = mov_review_rdd.map(lambda x: (x[1], (x[2])))
-        # summer_movie_genre_with_rating = mov_ratings.join(
-        #     summer_movies_with_genre)
+        mov_with_genre = extract_genres(
+            mov_with_genre, mov_genre_rdd, logger)
 
-        # summer_movie_genre_with_avg_rating = summer_movie_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[0], x[1][1][1])).map(
-        #     lambda x: (x[0], len(x[1]), sum(int(item[1][0]) for item in x[1]) / len(x[1])))
+        mov_with_genre = mov_with_genre.map(
+            lambda x: (x[0], (x[1][0], x[1][1])))
 
-        # sorted_summer_movie_genre_with_avg_rating = summer_movie_genre_with_avg_rating.sortBy(
-        #     lambda x: (x[0][0], -x[1]), ascending=[True, False]).map(lambda x: (x[0], x[2]))
+        mov_genre_with_rating = mov_review_with_user.join(mov_with_genre).map(
+            lambda x: (x[1][0][0], x[1][1][0], x[0], x[1][1][1], x[1][0][1]))
 
-        # grouped_summer_movie_genre_with_avg_rating = sorted_summer_movie_genre_with_avg_rating.groupBy(
-        #     lambda x: x[0][0])
+        # Compute for average rating and number of reviews based on occupation, genre, movie id and movie name
+        mov_genre_with_avg_rating = mov_genre_with_rating.groupBy(lambda x: (x[0], tuple(x[1]), x[2], x[3])).map(
+            lambda x: (x[0], len(x[1]), sum(int(item[4]) for item in x[1]) / len(x[1])))
 
-        # # Get the top three values for each groups
-        # top3_summer_movie_by_genre = grouped_summer_movie_genre_with_avg_rating.flatMap(
-        #     lambda key_values: (list(key_values[1])[:3],))
+        occupation_rdd = load_data(
+            sc, logger, MOVIE_OCCUPATION_DATA_FILE_PATH, "|")
+        occupation_list = occupation_rdd.flatMap(lambda x: x).collect()
 
-        # top3_summer_movie_by_genre = top3_summer_movie_by_genre.flatMap(
-        #     lambda row: row)
-        # show_rdd(top3_summer_movie_by_genre, logger)
+        genre_list = mov_genre_rdd.map(lambda x: x[0]).collect()
 
-        # # FIXME: winutils not compatible
-        # # top3_summer_movie_by_genre.saveAsTextFile(TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH)
-        # # ''.join(sorted(input(glob(TOP3_SUMMER_MOVIE_BY_GENRE_OUTPUT_PATH + "/part-0000*"))))
+        write_top_n_reviewed_movies_by_occupation_genre(
+            mov_genre_with_avg_rating, occupation_list, genre_list, 3, logger)
 
-        # mov_ratings = mov_review_rdd.map(lambda x: (x[0], (x[1], x[2])))
+        write_top_n_reviewed_movies_by_occupation_genre(
+            mov_genre_with_avg_rating, ["administrator"], ["Action"], 3, logger)
 
-        # mov_user_rdd = load_data(
-        #     sc, logger, MOVIE_USER_DATA_FILE_PATH, "|")
+        updated_reviews = add_new_user_profiles(
+            mov_review_rdd, new_user_profiles, sc, logger)
+        show_rdd(updated_reviews, logger)
+        logger.info(updated_reviews.count())
 
-        # mov_user_rdd = mov_user_rdd.map(lambda x: (x[0], x[3]))
+        # Selecting user/reviewer identifier, movie identifier, rating
+        ratings = updated_reviews.filter(lambda row: len(row) == 4).map(
+            lambda x: (int(x[0]), int(x[1]), float(x[2])))
 
-        # mov_review_with_user = mov_ratings.join(mov_user_rdd).map(
-        #     lambda x: (x[1][0][0], (x[1][0][1], x[1][1])))
+        # Define ALS model parameters
+        rank = 20
+        num_iterations = 15
 
-        # mov_item_rdd = mov_item_rdd.map(lambda line: (
-        #     line[0], (line[1], line[5:])))
+        mov_ratings_model = ALS.train(ratings, rank, num_iterations)
+        show_rdd(mov_ratings_model.userFeatures(), logger)
+        logger.info(mov_ratings_model.userFeatures().count())
 
-        # movies_with_genre = mov_item_rdd.map(lambda record: ([genre_mapping[str(
-        #     index)] for index, value in enumerate(record[1][1]) if value == "1"], record[0], record[1][0]))
+        user_id = 0
+        num_recommendations = 10
 
-        # movies_with_genre = movies_with_genre.map(
-        #     lambda x: (x[1], (x[0], x[2])))
-
-        # movie_genre_with_rating = mov_review_with_user.join(movies_with_genre)
-
-        # movie_genre_with_avg_rating = movie_genre_with_rating.groupBy(lambda x: (tuple(x[1][1][0]), x[1][0][1], x[0], x[1][1][1])).map(
-        #     lambda x: (x[0], len(x[1]), sum(int(item[1][0][0]) for item in x[1]) / len(x[1])))
-
-        # sorted_movie_genre_with_avg_rating = movie_genre_with_avg_rating.sortBy(
-        #     lambda x: (x[0][0], -x[1]), ascending=[True, False]).map(lambda x: (x[0][1], x[0][0], x[0][2], x[0][3], x[2]))
-
-        # grouped_movie_genre_with_avg_rating = sorted_movie_genre_with_avg_rating.groupBy(
-        #     lambda x: x[1])
-
-        # # Get the top three values for each groups
-        # top3_movie_by_genre = grouped_movie_genre_with_avg_rating.flatMap(
-        #     lambda key_values: (list(key_values[1])[:3],))
-
-        # top3_movie_by_genre = top3_movie_by_genre.flatMap(lambda row: row)
-        # show_rdd(top3_movie_by_genre, logger)
-
-        # filtered_data = top3_movie_by_genre.filter(
-        #     lambda row: row[0].lower() == "administrator" and "action" in row[1][0].lower())
-
-        # top3_admin_action_mov = filtered_data.take(3)
-        # logger.info(top3_admin_action_mov)
-
-        # new_user_profiles = [
-        #     [0, 50, 5, 881250949],
-        #     [0, 172, 5, 881250949],
-        #     [0, 181, 5, 881250949]
-        # ]
-
-        # updated_reviews = add_new_user_profiles(
-        #     mov_review_rdd, new_user_profiles, sc, logger)
-        # show_rdd(updated_reviews, logger)
-        # logger.info(updated_reviews.count())
-
-        # # Selecting user/reviewer identifier, movie identifier, rating
-        # ratings = updated_reviews.filter(lambda row: len(row) == 4).map(
-        #     lambda x: (int(x[0]), int(x[1]), float(x[2])))
-
-        # # Define ALS model parameters
-        # rank = 20
-        # num_iterations = 15
-
-        # mov_ratings_model = ALS.train(ratings, rank, num_iterations)
-        # show_rdd(mov_ratings_model.userFeatures(), logger)
-        # logger.info(mov_ratings_model.userFeatures().count())
-
-        # user_id = 0
-        # num_recommendations = 10
-
-        # # Use the model to recommend movies for the user
-        # mov_recommendations = mov_ratings_model.recommendProducts(
-        #     user_id, num_recommendations)
-        # print(mov_recommendations)
-        # logger.info(len(mov_recommendations))
+        # Use the model to recommend movies for the user
+        mov_recommendations = mov_ratings_model.recommendProducts(
+            user_id, num_recommendations)
+        print(mov_recommendations)
+        logger.info(len(mov_recommendations))
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
     finally:
